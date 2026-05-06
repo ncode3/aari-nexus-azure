@@ -1,0 +1,2 @@
+pulumi>=3.155.0,<4.0.0
+pulumi-azure-native>=2.92.0,<3.0.0

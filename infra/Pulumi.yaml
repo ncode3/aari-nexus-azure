@@ -1,0 +1,4 @@
+name: aari-nexus-azure
+runtime:
+  name: python
+description: AARI Nexus Operator on Azure Container Apps with Azure OpenAI integration

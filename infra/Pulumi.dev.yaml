@@ -1,0 +1,15 @@
+config:
+  azure-native:location: eastus
+  aari-nexus-azure:appVersion: "0.1.1"
+  aari-nexus-azure:containerImageName: "aari-nexus-azure:0.1.1"
+  aari-nexus-azure:telegramBotToken:
+    secure: v1:WjLUJHxqZ+gQGnr2:W+7MCqNCcM7P2ZmAjC6z2DgCJLr7KYUcj4ULKXgjwfQFl5N6XE6ZU9TInZjGS9rVCeUeveJR+cvxhs8i4qM=
+  aari-nexus-azure:azureOpenAiEndpoint:
+    secure: v1:quP1+nzQRHd2gs16:T6nD8E39JEaisTEBhV5H8E4buKGrMkFo3URCWGfX2XM1rX4PJzK2zVxxqSa9Ab2iiaxv3m+jt7S5p6I=
+  aari-nexus-azure:azureOpenAiApiKey:
+    secure: v1:JYkfDTe9nBk+FmNe:/y16bRmJ5sZRr6f8a777xbD14rNycp67WLaNK9zdHjvSFyfPZNQRKxZm+XaP8QfRJvKbvKA7FGtNlb8rsuiQ1Q9QE/33B3Xp5SVckQOOsiaTpWdbW592QphOVQpuADFV7lEtHg==
+  aari-nexus-azure:azureOpenAiDeployment:
+    secure: v1:Rao/gBRaCwbcqoQn:OCDq6PQ2JTK2p/F8KUhGb1c5CcU73UR0LpR0YQ==
+  aari-nexus-azure:azureOpenAiApiVersion:
+    secure: v1:3N0y8/DzEpgYGFTs:VZzNmfQzDHHqft2JolnGUkM9cNf89MmoGgM=
+encryptionsalt: v1:l2SMI4sqXME=:v1:eT2V1LdDId5P3Zbc:1S7+nUIFeTU13IK5+9y9tvSmMVLwiA==

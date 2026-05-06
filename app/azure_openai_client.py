@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+from openai import AsyncAzureOpenAI
+
+from app.config import Settings
+
+
+class AzureOpenAIClient:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self.client = AsyncAzureOpenAI(
+            api_key=settings.azure_openai_api_key,
+            api_version=settings.azure_openai_api_version,
+            azure_endpoint=settings.azure_openai_endpoint,
+        )
+
+    async def brief(self, prompt: str) -> str:
+        response = await self.client.chat.completions.create(
+            model=self.settings.azure_openai_deployment,
+            temperature=0.2,
+            max_tokens=300,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are AARI Nexus Operator. Give concise, direct answers with no fluff.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return response.choices[0].message.content or ""
+
+    async def probe(self) -> dict[str, object]:
+        try:
+            await self.client.chat.completions.create(
+                model=self.settings.azure_openai_deployment,
+                temperature=0,
+                max_tokens=1,
+                messages=[{"role": "user", "content": "ping"}],
+            )
+            return {
+                "healthy": True,
+                "status_code": 200,
+                "deployment_found": True,
+            }
+        except Exception as exc:
+            status_code = getattr(exc, "status_code", None) or 500
+            return {
+                "healthy": False,
+                "status_code": status_code,
+                "deployment_found": status_code != 404,
+            }
