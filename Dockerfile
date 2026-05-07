@@ -9,7 +9,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN groupadd --system appuser && useradd --system --gid appuser --create-home --home-dir /home/appuser appuser
+
 COPY app/ app/
+
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 

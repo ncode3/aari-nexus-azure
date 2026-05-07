@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import httpx
 
+from app.arbiter import NexusArbiter
 from app.azure_openai_client import AzureOpenAIClient
 from app.commands import handle_brief, handle_help, handle_ping, handle_status
 from app.config import Settings
@@ -22,6 +23,7 @@ class TelegramBotRunner:
         self._stop_event = asyncio.Event()
         self._offset = 0
         self._logger = logging.getLogger("aari-nexus-azure.bot")
+        self._arbiter = NexusArbiter()
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._poll_loop())
@@ -49,7 +51,7 @@ class TelegramBotRunner:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
-                    self._logger.exception("Polling loop error: %s", exc)
+                    self._logger.error("Polling loop error: %s", type(exc).__name__)
                     await asyncio.sleep(self.settings.bot_poll_interval_seconds)
 
     async def _handle_update(self, client: httpx.AsyncClient, update: dict[str, object]) -> None:
@@ -65,18 +67,24 @@ class TelegramBotRunner:
             return
 
         command, _, remainder = text.partition(" ")
-        if command == "/ping":
+        try:
+            decision = self._arbiter.authorize_command(command, remainder)
+        except ValueError as exc:
+            await self._send_message(client, int(chat_id), str(exc))
+            return
+
+        if decision.command == "/ping":
             reply = await handle_ping()
-        elif command == "/help":
+        elif decision.command == "/help":
             reply = await handle_help()
-        elif command == "/status":
+        elif decision.command == "/status":
             reply = await handle_status(self.settings, self.openai_client, self.started_at)
-        elif command == "/brief":
-            reply = await handle_brief(remainder, self.settings, self.openai_client)
+        elif decision.command == "/brief":
+            reply = await handle_brief(decision.prompt, self.settings, self.openai_client)
         else:
             reply = "Unknown command. Use /help."
 
-        log_event("telegram.command", command=command, chat_id=chat_id)
+        log_event("telegram.command", command=decision.command, chat_id=chat_id)
         await self._send_message(client, int(chat_id), reply)
 
     async def _send_message(self, client: httpx.AsyncClient, chat_id: int, text: str) -> None:

@@ -17,6 +17,12 @@ That process exposes:
 - stops the bot loop on shutdown
 - provides the health endpoint
 
+### Arbiter Layer
+
+- authorizes supported commands before execution
+- sanitizes `/brief` prompts before model dispatch
+- redacts sensitive log fields and artifact metadata
+
 ### Telegram Polling Bot
 
 - calls `getUpdates`
@@ -30,11 +36,17 @@ That process exposes:
 
 ### Blob Artifact Upload
 
-- optionally writes `/brief` request-response artifacts to Blob Storage
+- optionally writes sanitized `/brief` metadata artifacts to Blob Storage
+
+### Student Intake And Document Flow
+
+- `app/intake.py` represents student intake records and document classification
+- `app/document_flow.py` summarizes resume and supporting document flow without logging document contents
 
 ## Azure Resources
 
 - Resource Group
+- User Assigned Managed Identity
 - Azure Container Registry
 - Log Analytics Workspace
 - Application Insights

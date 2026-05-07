@@ -17,6 +17,8 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 pulumi stack init dev
 pulumi config set azure-native:location eastus
+pulumi config set environment dev
+pulumi config set regionAbbr eus
 pulumi config set --secret telegramBotToken "<TOKEN>"
 pulumi config set --secret azureOpenAiEndpoint "<ENDPOINT>"
 pulumi config set --secret azureOpenAiApiKey "<API_KEY>"
@@ -31,8 +33,8 @@ After the registry exists or after choosing the registry name:
 
 ```bash
 az acr login --name <ACR_NAME>
-docker build -t <ACR_LOGIN_SERVER>/aari-nexus-azure:dev ..
-docker push <ACR_LOGIN_SERVER>/aari-nexus-azure:dev
+docker build -t <ACR_LOGIN_SERVER>/aari-nexus-azure:0.2.1 ..
+docker push <ACR_LOGIN_SERVER>/aari-nexus-azure:0.2.1
 ```
 
 ## 4. Deploy
@@ -53,3 +55,9 @@ Then test in Telegram:
 - `/status`
 - `/help`
 - `/brief Explain AARI Nexus in one paragraph.`
+
+## Security Notes
+
+- the Container App uses managed identity for ACR, Key Vault, and Blob access
+- production secrets are stored in Key Vault and loaded by the app at startup through the user-assigned managed identity
+- `/brief` artifact uploads contain sanitized metadata only

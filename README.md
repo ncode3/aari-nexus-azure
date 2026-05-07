@@ -10,6 +10,7 @@ This repo deploys a simple Telegram bot backend to Azure Container Apps with:
 - Azure Key Vault
 - Azure Blob Storage for artifacts
 - Log Analytics and Application Insights for observability
+- an Arbiter layer for command authorization and log redaction
 - Pulumi Python with Azure Native
 
 V1 intentionally does not include AWS, Bedrock, Ollama, Kubernetes, or webhook complexity.
@@ -30,6 +31,9 @@ V1 intentionally does not include AWS, Bedrock, Ollama, Kubernetes, or webhook c
 ```text
 aari-nexus-azure/
 ├── app/
+│   ├── arbiter.py
+│   ├── document_flow.py
+│   ├── intake.py
 │   ├── main.py
 │   ├── bot.py
 │   ├── commands.py
@@ -46,10 +50,13 @@ aari-nexus-azure/
 ├── requirements.txt
 ├── .env.example
 ├── README.md
-└── docs/
-    ├── architecture.md
-    ├── deployment.md
-    └── runbook.md
+├── docs/
+│   ├── architecture.md
+│   ├── deployment.md
+│   └── runbook.md
+└── tests/
+    ├── test_arbiter.py
+    └── test_commands.py
 ```
 
 ## AWS Reference Findings
@@ -84,6 +91,9 @@ cp .env.example .env
 - `AZURE_OPENAI_API_KEY`
 - `AZURE_OPENAI_DEPLOYMENT`
 - `AZURE_OPENAI_API_VERSION`
+- optional production-only values:
+  - `AZURE_KEY_VAULT_URI`
+  - `AZURE_CLIENT_ID`
 
 3. Install dependencies:
 
@@ -93,13 +103,19 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
-4. Run locally:
+4. Run tests:
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+5. Run locally:
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-5. Check health:
+6. Check health:
 
 ```bash
 curl http://localhost:8000/healthz
@@ -139,6 +155,8 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 pulumi stack init dev
 pulumi config set azure-native:location eastus
+pulumi config set environment dev
+pulumi config set regionAbbr eus
 pulumi config set --secret telegramBotToken "<TOKEN>"
 pulumi config set --secret azureOpenAiEndpoint "<ENDPOINT>"
 pulumi config set --secret azureOpenAiApiKey "<API_KEY>"
@@ -172,8 +190,10 @@ pulumi up
 ## Notes
 
 - polling is used instead of webhook for v1 simplicity
-- Key Vault is created as the Azure secret store, while Pulumi secret config seeds the initial runtime values
-- artifact uploads are optional and only activate when storage is configured
+- Key Vault is the production secret source for the Container App
+- the app resolves production secrets from Key Vault at startup by using `DefaultAzureCredential` with the user-assigned managed identity
+- the Container App uses managed identity for ACR pull, Key Vault secret reads, and Blob artifact writes
+- artifact uploads store sanitized metadata, not raw prompts or responses
 
 More detail:
 

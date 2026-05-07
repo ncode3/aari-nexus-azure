@@ -1,7 +1,9 @@
 config:
   azure-native:location: eastus
-  aari-nexus-azure:appVersion: "0.1.1"
-  aari-nexus-azure:containerImageName: "aari-nexus-azure:0.1.1"
+  aari-nexus-azure:appVersion: "0.2.1"
+  aari-nexus-azure:containerImageTag: "0.2.1"
+  aari-nexus-azure:environment: dev
+  aari-nexus-azure:regionAbbr: eus
   aari-nexus-azure:telegramBotToken:
     secure: v1:WjLUJHxqZ+gQGnr2:W+7MCqNCcM7P2ZmAjC6z2DgCJLr7KYUcj4ULKXgjwfQFl5N6XE6ZU9TInZjGS9rVCeUeveJR+cvxhs8i4qM=
   aari-nexus-azure:azureOpenAiEndpoint:

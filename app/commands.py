@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from app.arbiter import NexusArbiter
 from app.azure_openai_client import AzureOpenAIClient
 from app.config import Settings
 from app.telemetry import log_event, upload_artifact
+
+ARBITER = NexusArbiter()
 
 
 def build_help_text() -> str:
@@ -15,6 +18,10 @@ def build_help_text() -> str:
             "/status - runtime and Azure service status",
             "/help - show this message",
             "/brief <prompt> - send a concise request to Azure OpenAI",
+            "",
+            "Architecture notes:",
+            "- command routing passes through the Nexus Arbiter",
+            "- student intake and document flow are represented internally",
         ]
     )
 
@@ -38,7 +45,7 @@ async def handle_status(
         "openai": "healthy" if probe["healthy"] else f"error:{probe['status_code']}",
         "deployment": "present" if probe["deployment_found"] else "missing",
         "key_vault": "configured" if settings.azure_key_vault_uri else "not-configured",
-        "blob_storage": "configured" if settings.azure_storage_connection_string else "not-configured",
+        "blob_storage": "configured" if (settings.azure_storage_connection_string or settings.azure_storage_account_url) else "not-configured",
         "app_insights": "configured" if settings.app_insights_connection_string else "not-configured",
     }
     return "\n".join(
@@ -63,11 +70,12 @@ async def handle_brief(
         return "Usage: /brief <prompt>"
 
     response = await openai_client.brief(cleaned)
-    log_event("telegram.brief", prompt=cleaned, response_length=len(response))
+    metadata = ARBITER.build_artifact_metadata(cleaned, response)
+    log_event("telegram.brief", **metadata)
     await upload_artifact(
         settings,
         artifact_kind="briefs",
         filename="brief.json",
-        payload={"prompt": cleaned, "response": response},
+        payload={"artifact_type": "brief", **metadata},
     )
     return response

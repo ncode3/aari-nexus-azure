@@ -30,6 +30,8 @@ Check:
 - `AZURE_OPENAI_API_KEY`
 - `AZURE_OPENAI_DEPLOYMENT`
 - `AZURE_OPENAI_API_VERSION`
+- Key Vault secret references are resolving in Container Apps
+- the managed identity has Key Vault Secrets User and Blob Data Contributor access
 
 ### `/status` reports deployment missing
 
@@ -39,8 +41,9 @@ The endpoint is reachable, but the configured deployment name does not match a l
 
 Check:
 
-- `AZURE_STORAGE_CONNECTION_STRING`
+- `AZURE_STORAGE_ACCOUNT_URL` or `AZURE_STORAGE_CONNECTION_STRING`
 - `AZURE_STORAGE_CONTAINER`
+- the managed identity has Storage Blob Data Contributor on the storage account
 
 ## Container App Logs
 
