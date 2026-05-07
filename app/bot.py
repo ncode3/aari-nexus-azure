@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import UTC, datetime
 
 import httpx
@@ -10,13 +11,21 @@ from app.arbiter import NexusArbiter
 from app.azure_openai_client import AzureOpenAIClient
 from app.commands import handle_brief, handle_help, handle_ping, handle_status
 from app.config import Settings
+from app.pep_client import PepClient
 from app.telemetry import log_event
 
 
 class TelegramBotRunner:
-    def __init__(self, settings: Settings, openai_client: AzureOpenAIClient, started_at: datetime) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        openai_client: AzureOpenAIClient,
+        pep_client: PepClient,
+        started_at: datetime,
+    ) -> None:
         self.settings = settings
         self.openai_client = openai_client
+        self.pep_client = pep_client
         self.started_at = started_at
         self.base_url = f"https://api.telegram.org/bot{settings.telegram_bot_token}"
         self._task: asyncio.Task[None] | None = None
@@ -67,24 +76,36 @@ class TelegramBotRunner:
             return
 
         command, _, remainder = text.partition(" ")
+        command_started = time.perf_counter()
         try:
             decision = self._arbiter.authorize_command(command, remainder)
         except ValueError as exc:
             await self._send_message(client, int(chat_id), str(exc))
             return
 
+        dependency_status = "bot-only"
         if decision.command == "/ping":
-            reply = await handle_ping()
+            reply = await handle_ping(self.settings, command_started)
         elif decision.command == "/help":
             reply = await handle_help()
         elif decision.command == "/status":
-            reply = await handle_status(self.settings, self.openai_client, self.started_at)
+            reply, services = await handle_status(self.settings, self.openai_client, self.pep_client, self.started_at)
+            dependency_status = ",".join(f"{name}={status}" for name, status in services.items())
         elif decision.command == "/brief":
             reply = await handle_brief(decision.prompt, self.settings, self.openai_client)
+            dependency_status = "azure-openai"
         else:
             reply = "Unknown command. Use /help."
 
-        log_event("telegram.command", command=decision.command, chat_id=chat_id)
+        latency_ms = max(0, round((time.perf_counter() - command_started) * 1000, 2))
+        log_event(
+            "telegram.command",
+            command=decision.command,
+            route=decision.command,
+            chat_id=chat_id,
+            latency_ms=latency_ms,
+            dependency_status=dependency_status,
+        )
         await self._send_message(client, int(chat_id), reply)
 
     async def _send_message(self, client: httpx.AsyncClient, chat_id: int, text: str) -> None:

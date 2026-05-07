@@ -9,7 +9,7 @@ curl http://localhost:8000/healthz
 Expected:
 
 ```json
-{"status":"ok","service":"aari-nexus-azure","version":"0.1.0","region":"eastus"}
+{"status":"ok","service":"aari-nexus-azure","version":"0.2.2","region":"eastus"}
 ```
 
 ## Common Runtime Checks
@@ -21,6 +21,10 @@ Check:
 - `TELEGRAM_BOT_TOKEN`
 - container logs
 - bot polling loop startup logs
+
+### `/ping` is slow
+
+`/ping` should not depend on PEP or Azure OpenAI. If it slows down, check bot logs for command latency and verify no dependency checks were added back into the `/ping` path.
 
 ### `/brief` fails
 
@@ -36,6 +40,17 @@ Check:
 ### `/status` reports deployment missing
 
 The endpoint is reachable, but the configured deployment name does not match a live Azure OpenAI deployment.
+
+### `/status` reports `pep: degraded`
+
+Check:
+
+- `PEP_BASE_URL`
+- local single-process value: `http://localhost:8081`
+- Docker Compose value: `http://pep:8081`
+- Azure internal service URL for Container Apps
+- do not use `0.0.0.0` as a client URL
+- PEP health timeout is intentionally capped at 1 second
 
 ### Artifact uploads do not appear
 

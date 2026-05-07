@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from openai import AsyncAzureOpenAI
 
 from app.config import Settings
@@ -15,27 +17,33 @@ class AzureOpenAIClient:
         )
 
     async def brief(self, prompt: str) -> str:
-        response = await self.client.chat.completions.create(
-            model=self.settings.azure_openai_deployment,
-            temperature=0.2,
-            max_tokens=300,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are AARI Nexus Operator. Give concise, direct answers with no fluff.",
-                },
-                {"role": "user", "content": prompt},
-            ],
+        response = await asyncio.wait_for(
+            self.client.chat.completions.create(
+                model=self.settings.azure_openai_deployment,
+                temperature=0.2,
+                max_tokens=300,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are AARI Nexus Operator. Give concise, direct answers with no fluff.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            ),
+            timeout=self.settings.model_timeout_seconds,
         )
         return response.choices[0].message.content or ""
 
     async def probe(self) -> dict[str, object]:
         try:
-            await self.client.chat.completions.create(
-                model=self.settings.azure_openai_deployment,
-                temperature=0,
-                max_tokens=1,
-                messages=[{"role": "user", "content": "ping"}],
+            await asyncio.wait_for(
+                self.client.chat.completions.create(
+                    model=self.settings.azure_openai_deployment,
+                    temperature=0,
+                    max_tokens=1,
+                    messages=[{"role": "user", "content": "ping"}],
+                ),
+                timeout=self.settings.model_timeout_seconds,
             )
             return {
                 "healthy": True,

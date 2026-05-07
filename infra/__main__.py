@@ -23,7 +23,7 @@ env_name = config.get("environment") or "dev"
 location = config.get("location") or "eastus"
 region_abbr = config.get("regionAbbr") or "eus"
 sequence = config.get("sequence") or "001"
-app_version = config.get("appVersion") or "0.2.1"
+app_version = config.get("appVersion") or "0.2.2"
 image_tag = config.get("containerImageTag") or app_version
 image_name = f"aari-nexus-azure:{image_tag}"
 

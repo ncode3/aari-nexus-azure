@@ -33,8 +33,8 @@ After the registry exists or after choosing the registry name:
 
 ```bash
 az acr login --name <ACR_NAME>
-docker build -t <ACR_LOGIN_SERVER>/aari-nexus-azure:0.2.1 ..
-docker push <ACR_LOGIN_SERVER>/aari-nexus-azure:0.2.1
+docker build -t <ACR_LOGIN_SERVER>/aari-nexus-azure:0.2.2 ..
+docker push <ACR_LOGIN_SERVER>/aari-nexus-azure:0.2.2
 ```
 
 ## 4. Deploy
@@ -55,6 +55,13 @@ Then test in Telegram:
 - `/status`
 - `/help`
 - `/brief Explain AARI Nexus in one paragraph.`
+
+PEP client configuration:
+
+- local single-process: `PEP_BASE_URL=http://localhost:8081`
+- Docker Compose: `PEP_BASE_URL=http://pep:8081`
+- Azure Container Apps: set `PEP_BASE_URL` to the internal PEP service URL
+- never use `0.0.0.0` as a client URL
 
 ## Security Notes
 

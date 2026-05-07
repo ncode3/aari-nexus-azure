@@ -1,7 +1,7 @@
 config:
   azure-native:location: eastus
-  aari-nexus-azure:appVersion: "0.2.1"
-  aari-nexus-azure:containerImageTag: "0.2.1"
+  aari-nexus-azure:appVersion: "0.2.2"
+  aari-nexus-azure:containerImageTag: "0.2.2"
   aari-nexus-azure:environment: dev
   aari-nexus-azure:regionAbbr: eus
   aari-nexus-azure:telegramBotToken:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from app.arbiter import NexusArbiter
+from app.config import _normalize_pep_base_url
 from app.document_flow import summarize_document_flow
 from app.intake import build_student_intake_record
 
@@ -32,6 +33,10 @@ class ArbiterTests(unittest.TestCase):
         self.assertEqual(summary["document_count"], 2)
         self.assertIn("resume", summary["document_types"])
         self.assertIn("transcript", summary["document_types"])
+
+    def test_pep_url_normalization(self) -> None:
+        self.assertEqual(_normalize_pep_base_url("http://0.0.0.0:8081"), "http://localhost:8081")
+        self.assertEqual(_normalize_pep_base_url("http://pep:8081/"), "http://pep:8081")
 
 
 if __name__ == "__main__":

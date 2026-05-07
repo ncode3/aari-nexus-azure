@@ -17,9 +17,9 @@ V1 intentionally does not include AWS, Bedrock, Ollama, Kubernetes, or webhook c
 
 ## Commands
 
-- `/ping` -> `pong`
+- `/ping` -> bot-only liveness check with `pong`, `latency_ms`, `bot_pid`, `app_version`
 - `/help` -> command list
-- `/status` -> Azure runtime status, model, region, version, uptime
+- `/status` -> Azure runtime status, model, region, version, uptime, and degraded dependency checks
 - `/brief <prompt>` -> concise Azure OpenAI answer
 
 ## Health Endpoint
@@ -91,9 +91,17 @@ cp .env.example .env
 - `AZURE_OPENAI_API_KEY`
 - `AZURE_OPENAI_DEPLOYMENT`
 - `AZURE_OPENAI_API_VERSION`
+- `PEP_BASE_URL`
 - optional production-only values:
   - `AZURE_KEY_VAULT_URI`
   - `AZURE_CLIENT_ID`
+
+PEP URL rules:
+
+- local single-process testing uses `http://localhost:8081`
+- Docker Compose uses `http://pep:8081`
+- Azure Container Apps uses the internal service URL for the PEP app
+- never use `0.0.0.0` as a client URL
 
 3. Install dependencies:
 
@@ -120,6 +128,11 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```bash
 curl http://localhost:8000/healthz
 ```
+
+7. Expected `/ping` behavior:
+
+- returns immediately without calling PEP, Azure OpenAI, Blob Storage, Key Vault, or Application Insights
+- includes `latency_ms`, `bot_pid`, and `app_version`
 
 ## Local Docker Test
 
@@ -193,6 +206,8 @@ pulumi up
 - Key Vault is the production secret source for the Container App
 - the app resolves production secrets from Key Vault at startup by using `DefaultAzureCredential` with the user-assigned managed identity
 - the Container App uses managed identity for ACR pull, Key Vault secret reads, and Blob artifact writes
+- PEP health checks use `PEP_BASE_URL` with a 1-second timeout and degrade `/status` instead of blocking the bot
+- `/ping` is isolated from downstream dependencies and serves as a bot-only liveness check
 - artifact uploads store sanitized metadata, not raw prompts or responses
 
 More detail:
