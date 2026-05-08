@@ -93,7 +93,7 @@ def get_settings() -> Settings:
         azure_openai_deployment=_get_env_or_key_vault("AZURE_OPENAI_DEPLOYMENT", azure_key_vault_uri),
         azure_openai_api_version=_get_env_or_key_vault("AZURE_OPENAI_API_VERSION", azure_key_vault_uri) or "2024-10-21",
         azure_region=os.getenv("AZURE_REGION", "eastus").strip(),
-        app_version=os.getenv("APP_VERSION", "0.2.2").strip(),
+        app_version=os.getenv("APP_VERSION", "0.2.3").strip(),
         app_env=os.getenv("APP_ENV", "dev").strip(),
         bot_poll_interval_seconds=max(1, int(os.getenv("BOT_POLL_INTERVAL_SECONDS", "2"))),
         bot_allowed_chat_ids=_split_chat_ids(os.getenv("BOT_ALLOWED_CHAT_IDS", "").strip()),

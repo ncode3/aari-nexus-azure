@@ -93,7 +93,7 @@ class TelegramBotRunner:
             dependency_status = ",".join(f"{name}={status}" for name, status in services.items())
         elif decision.command == "/brief":
             reply = await handle_brief(decision.prompt, self.settings, self.openai_client)
-            dependency_status = "azure-openai"
+            dependency_status = "arbiter-preflight,azure-openai"
         else:
             reply = "Unknown command. Use /help."
 

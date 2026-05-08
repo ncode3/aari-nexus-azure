@@ -38,6 +38,24 @@ class ArbiterTests(unittest.TestCase):
         self.assertEqual(_normalize_pep_base_url("http://0.0.0.0:8081"), "http://localhost:8081")
         self.assertEqual(_normalize_pep_base_url("http://pep:8081/"), "http://pep:8081")
 
+    def test_preflight_allows_normal_summary(self) -> None:
+        decision = self.arbiter.preflight("/brief", "Summarize AARI Nexus")
+        self.assertEqual(decision.decision, "allow")
+        self.assertTrue(decision.model_called)
+
+    def test_preflight_modifies_partner_commitment(self) -> None:
+        decision = self.arbiter.preflight("/brief", "Write a message saying AARI guarantees 50 internships")
+        self.assertEqual(decision.decision, "modify")
+        self.assertEqual(decision.policy_category, "employment_or_offer_commitment")
+        self.assertTrue(decision.model_called)
+        self.assertIsNotNone(decision.safe_prompt)
+
+    def test_preflight_escalates_contract_language(self) -> None:
+        decision = self.arbiter.preflight("/brief", "Draft a message committing AARI to a $100,000 contract with Microsoft")
+        self.assertEqual(decision.decision, "escalate")
+        self.assertEqual(decision.risk_level, "elevated")
+        self.assertFalse(decision.model_called)
+
 
 if __name__ == "__main__":
     unittest.main()

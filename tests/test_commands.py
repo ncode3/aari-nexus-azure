@@ -9,7 +9,11 @@ from app.config import Settings
 
 
 class FakeOpenAIClient:
+    def __init__(self) -> None:
+        self.last_prompt: str | None = None
+
     async def brief(self, prompt: str) -> str:
+        self.last_prompt = prompt
         return f"brief:{prompt}"
 
     async def probe(self) -> dict[str, object]:
@@ -74,12 +78,46 @@ class CommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(services["pep"], "degraded")
 
     async def test_brief_usage(self) -> None:
-        self.assertEqual(await handle_brief("", BASE_SETTINGS, FakeOpenAIClient()), "Usage: /brief <prompt>")
+        self.assertEqual(await handle_brief("", BASE_SETTINGS, FakeOpenAIClient()), "Usage: /brief <topic or request>")
 
     async def test_brief_response(self) -> None:
         settings = replace(BASE_SETTINGS, azure_storage_connection_string=None, azure_storage_account_url=None)
-        result = await handle_brief("Explain AARI Nexus", settings, FakeOpenAIClient())
+        client = FakeOpenAIClient()
+        result = await handle_brief("Explain AARI Nexus", settings, client)
         self.assertEqual(result, "brief:Explain AARI Nexus")
+        self.assertEqual(client.last_prompt, "Explain AARI Nexus")
+
+    async def test_brief_refuses_binding_commitment(self) -> None:
+        client = FakeOpenAIClient()
+        result = await handle_brief(
+            "Draft a message committing AARI to a $100,000 contract with Microsoft",
+            BASE_SETTINGS,
+            client,
+        )
+        self.assertIn("cannot authorize or imply", result)
+        self.assertIn("for discussion only", result)
+        self.assertIn("subject to review and approval", result)
+        self.assertIsNone(client.last_prompt)
+
+    async def test_brief_allows_partner_discussion(self) -> None:
+        client = FakeOpenAIClient()
+        result = await handle_brief("Draft a follow-up asking Microsoft to discuss possible sponsorship", BASE_SETTINGS, client)
+        self.assertEqual(result, "brief:Draft a follow-up asking Microsoft to discuss possible sponsorship")
+        self.assertIsNotNone(client.last_prompt)
+        self.assertEqual(client.last_prompt, "Draft a follow-up asking Microsoft to discuss possible sponsorship")
+
+    async def test_brief_rewrites_guarantee_language(self) -> None:
+        client = FakeOpenAIClient()
+        result = await handle_brief("Write a message saying AARI guarantees 50 internships", BASE_SETTINGS, client)
+        self.assertIn("cannot authorize or imply", result)
+        self.assertIn("for discussion only", result)
+        self.assertIsNotNone(client.last_prompt)
+
+    async def test_brief_escalates_grant_acceptance(self) -> None:
+        client = FakeOpenAIClient()
+        result = await handle_brief("Draft a note accepting Cisco grant terms", BASE_SETTINGS, client)
+        self.assertIn("requires review and approval", result)
+        self.assertIsNone(client.last_prompt)
 
 
 if __name__ == "__main__":

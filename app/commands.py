@@ -85,9 +85,22 @@ async def handle_brief(
 ) -> str:
     cleaned = prompt.strip()
     if not cleaned:
-        return "Usage: /brief <prompt>"
+        return "Usage: /brief <topic or request>"
 
-    response = await openai_client.brief(cleaned)
+    decision = ARBITER.preflight("/brief", cleaned)
+    log_event("arbiter.preflight", **ARBITER.build_decision_log(decision))
+
+    if decision.decision == "block":
+        return decision.user_response or "Request blocked by policy."
+
+    if decision.decision == "escalate":
+        return decision.user_response or "This request requires review and approval."
+
+    model_prompt = decision.safe_prompt if decision.decision == "modify" else cleaned
+    response = await openai_client.brief(model_prompt)
+    if decision.decision == "modify" and decision.user_response:
+        response = f"{decision.user_response}\n\n{response}"
+
     metadata = ARBITER.build_artifact_metadata(cleaned, response)
     log_event("telegram.brief", **metadata)
     await upload_artifact(
