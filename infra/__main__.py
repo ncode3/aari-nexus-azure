@@ -63,6 +63,14 @@ def deterministic_guid(*parts: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_URL, "::".join(parts)))
 
 
+def enabled_log(category: str) -> insights.LogSettingsArgs:
+    return insights.LogSettingsArgs(category=category, enabled=True)
+
+
+def enabled_metric(category: str) -> insights.MetricSettingsArgs:
+    return insights.MetricSettingsArgs(category=category, enabled=True)
+
+
 tags = {
     "org": "aari",
     "workload": workload,
@@ -83,6 +91,14 @@ resource_group = resources.ResourceGroup(
     resource_group_name=resource_name("rg"),
     location=location,
     tags=tags,
+)
+
+resource_group_delete_lock = authorization.ManagementLockByScope(
+    "resourceGroupDeleteLock",
+    scope=resource_group.id,
+    lock_name="aari-nexus-dev-delete-lock",
+    level=authorization.LockLevel.CAN_NOT_DELETE,
+    notes="Prevent accidental deletion of the Nexus resource group.",
 )
 
 workspace = operationalinsights.Workspace(
@@ -138,6 +154,16 @@ blob_container = storage.BlobContainer(
     public_access=storage.PublicAccess.NONE,
 )
 
+blob_service = storage.BlobServiceProperties(
+    "blobServiceSecurityProperties",
+    resource_group_name=resource_group.name,
+    account_name=storage_account.name,
+    blob_services_name="default",
+    is_versioning_enabled=True,
+    delete_retention_policy=storage.DeleteRetentionPolicyArgs(enabled=True, days=14),
+    container_delete_retention_policy=storage.DeleteRetentionPolicyArgs(enabled=True, days=14),
+)
+
 identity = managedidentity.UserAssignedIdentity(
     resource_name("id"),
     resource_group_name=resource_group.name,
@@ -155,6 +181,9 @@ vault = keyvault.Vault(
         tenant_id=client_config.tenant_id,
         sku=keyvault.SkuArgs(family="A", name=keyvault.SkuName.STANDARD),
         enable_rbac_authorization=True,
+        enable_purge_protection=True,
+        enable_soft_delete=True,
+        soft_delete_retention_in_days=90,
         access_policies=[],
         public_network_access="Enabled",
     ),
@@ -319,6 +348,59 @@ container_app = app.ContainerApp(
     ),
     tags=tags,
     opts=ResourceOptions(depends_on=[acr_pull_assignment, kv_secrets_assignment, blob_data_assignment]),
+)
+
+key_vault_diagnostics = insights.DiagnosticSetting(
+    "keyVaultDiagnostics",
+    name="aari-kv-audit-to-law",
+    resource_uri=vault.id,
+    workspace_id=workspace.id,
+    log_analytics_destination_type="Dedicated",
+    logs=[
+        enabled_log("AuditEvent"),
+        enabled_log("AzurePolicyEvaluationDetails"),
+    ],
+    metrics=[enabled_metric("AllMetrics")],
+)
+
+acr_diagnostics = insights.DiagnosticSetting(
+    "acrDiagnostics",
+    name="aari-acr-audit-to-law",
+    resource_uri=acr.id,
+    workspace_id=workspace.id,
+    log_analytics_destination_type="Dedicated",
+    logs=[
+        enabled_log("ContainerRegistryRepositoryEvents"),
+        enabled_log("ContainerRegistryLoginEvents"),
+    ],
+    metrics=[enabled_metric("AllMetrics")],
+)
+
+storage_blob_diagnostics = insights.DiagnosticSetting(
+    "storageBlobDiagnostics",
+    name="aari-storage-blob-audit-to-law",
+    resource_uri=Output.concat(storage_account.id, "/blobServices/default"),
+    workspace_id=workspace.id,
+    log_analytics_destination_type="Dedicated",
+    logs=[
+        enabled_log("StorageRead"),
+        enabled_log("StorageWrite"),
+        enabled_log("StorageDelete"),
+    ],
+    metrics=[
+        enabled_metric("Transaction"),
+        enabled_metric("Capacity"),
+    ],
+    opts=ResourceOptions(depends_on=[blob_service]),
+)
+
+container_app_diagnostics = insights.DiagnosticSetting(
+    "containerAppDiagnostics",
+    name="aari-containerapp-metrics-to-law",
+    resource_uri=container_app.id,
+    workspace_id=workspace.id,
+    log_analytics_destination_type="Dedicated",
+    metrics=[enabled_metric("AllMetrics")],
 )
 
 pulumi.export("resourceGroupName", resource_group.name)
