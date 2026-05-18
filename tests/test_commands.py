@@ -3,9 +3,11 @@ from __future__ import annotations
 import unittest
 from dataclasses import replace
 from datetime import UTC, datetime
+from tempfile import TemporaryDirectory
 
-from app.commands import handle_brief, handle_help, handle_ping, handle_status
+from app.commands import handle_brief, handle_help, handle_operational_command, handle_ping, handle_status
 from app.config import Settings
+from app.memory import MemoryStore
 
 
 class FakeOpenAIClient:
@@ -15,6 +17,10 @@ class FakeOpenAIClient:
     async def brief(self, prompt: str) -> str:
         self.last_prompt = prompt
         return f"brief:{prompt}"
+
+    async def complete(self, system_prompt: str, user_prompt: str, max_tokens: int = 450) -> str:
+        self.last_prompt = user_prompt
+        return f"complete:{user_prompt[:80]}"
 
     async def probe(self) -> dict[str, object]:
         return {"healthy": True, "status_code": 200, "deployment_found": True}
@@ -49,6 +55,8 @@ BASE_SETTINGS = Settings(
     pep_base_url="http://localhost:8081",
     pep_health_timeout_seconds=1.0,
     model_timeout_seconds=20.0,
+    nexus_memory_path="data/test_memory.sqlite3",
+    nexus_debug_json=False,
 )
 
 
@@ -62,7 +70,8 @@ class CommandTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_help(self) -> None:
         text = await handle_help()
-        self.assertIn("/brief <prompt>", text)
+        self.assertIn("/brief <topic>", text)
+        self.assertIn("/remember <fact/decision>", text)
         self.assertIn("Nexus Arbiter", text)
 
     async def test_status(self) -> None:
@@ -118,6 +127,51 @@ class CommandTests(unittest.IsolatedAsyncioTestCase):
         result = await handle_brief("Draft a note accepting Cisco grant terms", BASE_SETTINGS, client)
         self.assertIn("requires review and approval", result)
         self.assertIsNone(client.last_prompt)
+
+    async def test_remember_and_find(self) -> None:
+        with TemporaryDirectory() as tmp:
+            store = MemoryStore(f"{tmp}/memory.sqlite3")
+            result = await handle_operational_command(
+                "/remember",
+                "Cisco is interested in AARI edge AI workforce programming",
+                BASE_SETTINGS,
+                FakeOpenAIClient(),
+                store,
+            )
+            self.assertIn("Remembered", result)
+            result = await handle_operational_command("/find", "Cisco edge AI", BASE_SETTINGS, FakeOpenAIClient(), store)
+            self.assertIn("Found 1 matching memory", result)
+            self.assertIn("Cisco is interested", result)
+
+    async def test_followup_stores_pending_action_package(self) -> None:
+        with TemporaryDirectory() as tmp:
+            store = MemoryStore(f"{tmp}/memory.sqlite3")
+            store.save_memory("Microsoft asked for an AARI partnership summary", "organizations")
+            result = await handle_operational_command(
+                "/followup",
+                "Microsoft partnership",
+                BASE_SETTINGS,
+                FakeOpenAIClient(),
+                store,
+            )
+            self.assertIn("Approval required: APPROVE, EDIT, TASK, CANCEL", result)
+            pending = store.get_pending_action()
+            self.assertIsNotNone(pending)
+            assert pending is not None
+            self.assertEqual(pending["agent"], "PartnershipAgent")
+            self.assertEqual(pending["status"], "pending")
+            self.assertTrue(pending["approval_required"])
+
+    async def test_prep_retrieves_memory_before_answering(self) -> None:
+        with TemporaryDirectory() as tmp:
+            store = MemoryStore(f"{tmp}/memory.sqlite3")
+            client = FakeOpenAIClient()
+            store.save_memory("QTS discussion centered on data center workforce curriculum", "organizations")
+            result = await handle_operational_command("/prep", "QTS", BASE_SETTINGS, client, store)
+            self.assertIn("Prep package ready", result)
+            self.assertIsNotNone(client.last_prompt)
+            assert client.last_prompt is not None
+            self.assertIn("QTS discussion centered", client.last_prompt)
 
 
 if __name__ == "__main__":

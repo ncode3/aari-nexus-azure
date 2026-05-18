@@ -2,11 +2,12 @@
 
 AARI Nexus Operator rebuilt for Azure.
 
-This repo deploys a simple Telegram bot backend to Azure Container Apps with:
+This repo deploys a private AARI Nexus Telegram backend to Azure Container Apps with:
 
 - FastAPI runtime
 - Telegram polling bot
-- Azure OpenAI for `/brief`
+- Azure OpenAI for operational drafting and briefs
+- SQLite memory and action packages for the MVP chief-of-staff workflow
 - Azure Key Vault
 - Azure Blob Storage for artifacts
 - Log Analytics and Application Insights for observability
@@ -20,7 +21,50 @@ V1 intentionally does not include AWS, Bedrock, Ollama, Kubernetes, or webhook c
 - `/ping` -> bot-only liveness check with `pong`, `latency_ms`, `bot_pid`, `app_version`
 - `/help` -> command list
 - `/status` -> Azure runtime status, model, region, version, uptime, and degraded dependency checks
-- `/brief <prompt>` -> concise Azure OpenAI answer
+- `/brief <topic>` -> retrieve memory and prepare an operational brief
+- `/followup <person/company/topic>` -> retrieve context, draft a follow-up, store a pending action package
+- `/prep <meeting/person/company>` -> retrieve context and prepare a meeting/person/company brief
+- `/remember <fact/decision>` -> save memory
+- `/find <topic/person/project>` -> search memory
+- `/draft <email/post/doc>` -> store a draft action package requiring approval before external use
+- `/task <task>` -> capture a task action package
+
+Nexus stores full JSON action packages in SQLite. Telegram output stays concise unless `NEXUS_DEBUG_JSON=true`.
+
+## Chief-Of-Staff Workflow
+
+The operational command path is:
+
+1. Receive Telegram message
+2. Classify command intent
+3. Retrieve relevant memory for context-heavy commands
+4. Route to the correct MVP agent
+5. Generate an action package
+6. Store the package
+7. Ask Nolan for approval when external execution would be required
+
+External execution is intentionally not implemented in this milestone. Nexus may draft, summarize, remember, prepare, and recommend. It must not send email, deploy infrastructure, delete data, spend money, or message external people without approval.
+
+MVP agents:
+
+- `ChiefOfStaffAgent`
+- `PartnershipAgent`
+- `GrantAgent`
+- `SprintAgent`
+- `InfrastructureAgent`
+- `MemoryAgent`
+- `WritingAgent`
+
+SQLite memory currently supports:
+
+- people
+- organizations
+- projects
+- decisions
+- tasks
+- deadlines
+- drafts
+- action packages
 
 ## Health Endpoint
 
@@ -92,6 +136,8 @@ cp .env.example .env
 - `AZURE_OPENAI_DEPLOYMENT`
 - `AZURE_OPENAI_API_VERSION`
 - `PEP_BASE_URL`
+- `NEXUS_MEMORY_PATH`
+- `NEXUS_DEBUG_JSON`
 - optional production-only values:
   - `AZURE_KEY_VAULT_URI`
   - `AZURE_CLIENT_ID`
@@ -198,7 +244,11 @@ pulumi up
 - send `/ping` in Telegram
 - send `/status`
 - send `/help`
-- send `/brief Explain AARI Nexus in one paragraph.`
+- send `/remember Cisco is interested in AARI edge AI workforce programming`
+- send `/find Cisco edge AI`
+- send `/brief Cisco partnership context`
+- send `/prep QTS data center workforce meeting`
+- send `/followup Microsoft partnership`
 
 ## Notes
 
@@ -208,6 +258,8 @@ pulumi up
 - the Container App uses managed identity for ACR pull, Key Vault secret reads, and Blob artifact writes
 - PEP health checks use `PEP_BASE_URL` with a 1-second timeout and degrade `/status` instead of blocking the bot
 - `/ping` is isolated from downstream dependencies and serves as a bot-only liveness check
+- action packages are stored in SQLite locally for the MVP
+- Telegram replies render human-readable summaries, not raw JSON, unless `NEXUS_DEBUG_JSON=true`
 - artifact uploads store sanitized metadata, not raw prompts or responses
 
 More detail:

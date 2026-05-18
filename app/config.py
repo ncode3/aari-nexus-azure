@@ -53,6 +53,8 @@ class Settings:
     pep_base_url: str
     pep_health_timeout_seconds: float
     model_timeout_seconds: float
+    nexus_memory_path: str
+    nexus_debug_json: bool
 
 
 def _get_secret_client(vault_uri: str) -> SecretClient:
@@ -93,7 +95,7 @@ def get_settings() -> Settings:
         azure_openai_deployment=_get_env_or_key_vault("AZURE_OPENAI_DEPLOYMENT", azure_key_vault_uri),
         azure_openai_api_version=_get_env_or_key_vault("AZURE_OPENAI_API_VERSION", azure_key_vault_uri) or "2024-10-21",
         azure_region=os.getenv("AZURE_REGION", "eastus").strip(),
-        app_version=os.getenv("APP_VERSION", "0.2.3").strip(),
+        app_version=os.getenv("APP_VERSION", "0.3.0").strip(),
         app_env=os.getenv("APP_ENV", "dev").strip(),
         bot_poll_interval_seconds=max(1, int(os.getenv("BOT_POLL_INTERVAL_SECONDS", "2"))),
         bot_allowed_chat_ids=_split_chat_ids(os.getenv("BOT_ALLOWED_CHAT_IDS", "").strip()),
@@ -105,6 +107,8 @@ def get_settings() -> Settings:
         pep_base_url=_normalize_pep_base_url(os.getenv("PEP_BASE_URL", "http://localhost:8081")),
         pep_health_timeout_seconds=max(0.1, float(os.getenv("PEP_HEALTH_TIMEOUT_SECONDS", "1"))),
         model_timeout_seconds=max(1.0, float(os.getenv("MODEL_TIMEOUT_SECONDS", "20"))),
+        nexus_memory_path=os.getenv("NEXUS_MEMORY_PATH", str(BASE_DIR / "data" / "nexus_memory.sqlite3")).strip(),
+        nexus_debug_json=os.getenv("NEXUS_DEBUG_JSON", "").strip().lower() in {"1", "true", "yes"},
     )
 
 

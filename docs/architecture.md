@@ -26,13 +26,38 @@ That process exposes:
 ### Telegram Polling Bot
 
 - calls `getUpdates`
-- parses `/ping`, `/status`, `/help`, `/brief`
+- parses `/ping`, `/status`, `/help`, `/brief`, `/followup`, `/prep`, `/remember`, `/find`, `/draft`, `/task`
 - replies with `sendMessage`
+
+### Nexus Chief-Of-Staff Layer
+
+- classifies command intent
+- retrieves SQLite memory for context-heavy commands
+- routes to MVP agents:
+  - `ChiefOfStaffAgent`
+  - `PartnershipAgent`
+  - `GrantAgent`
+  - `SprintAgent`
+  - `InfrastructureAgent`
+  - `MemoryAgent`
+  - `WritingAgent`
+- generates action packages
+- stores full JSON packages in SQLite
+- renders concise Telegram summaries
+- marks external actions as approval-required instead of executing them
+
+Commands that may draft external-facing work, such as `/followup`, `/draft`, and `/task`, produce pending action packages with `APPROVE`, `EDIT`, `TASK`, and `CANCEL` options. No external execution happens in this milestone.
 
 ### Azure OpenAI Client
 
 - probes deployment availability
-- sends `/brief` prompts to the configured Azure OpenAI deployment
+- sends operational drafting and briefing prompts to the configured Azure OpenAI deployment
+
+### SQLite Memory
+
+- local MVP storage, configured with `NEXUS_MEMORY_PATH`
+- supports people, organizations, projects, decisions, tasks, deadlines, drafts, and action packages
+- exposes `save_memory`, `search_memory`, `list_recent_memory`, `save_action_package`, `get_pending_action`, and `update_action_status`
 
 ### Blob Artifact Upload
 

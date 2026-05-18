@@ -9,8 +9,9 @@ import httpx
 
 from app.arbiter import NexusArbiter
 from app.azure_openai_client import AzureOpenAIClient
-from app.commands import handle_brief, handle_help, handle_ping, handle_status
+from app.commands import handle_brief, handle_help, handle_operational_command, handle_ping, handle_status
 from app.config import Settings
+from app.memory import MemoryStore
 from app.pep_client import PepClient
 from app.telemetry import log_event
 
@@ -33,6 +34,7 @@ class TelegramBotRunner:
         self._offset = 0
         self._logger = logging.getLogger("aari-nexus-azure.bot")
         self._arbiter = NexusArbiter()
+        self.memory_store = MemoryStore(settings.nexus_memory_path)
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._poll_loop())
@@ -92,8 +94,17 @@ class TelegramBotRunner:
             reply, services = await handle_status(self.settings, self.openai_client, self.pep_client, self.started_at)
             dependency_status = ",".join(f"{name}={status}" for name, status in services.items())
         elif decision.command == "/brief":
-            reply = await handle_brief(decision.prompt, self.settings, self.openai_client)
-            dependency_status = "arbiter-preflight,azure-openai"
+            reply = await handle_brief(decision.prompt, self.settings, self.openai_client, self.memory_store)
+            dependency_status = "arbiter-preflight,memory,azure-openai"
+        elif decision.command in {"/remember", "/find", "/followup", "/prep", "/draft", "/task"}:
+            reply = await handle_operational_command(
+                decision.command,
+                decision.prompt,
+                self.settings,
+                self.openai_client,
+                self.memory_store,
+            )
+            dependency_status = "memory,agent-router"
         else:
             reply = "Unknown command. Use /help."
 

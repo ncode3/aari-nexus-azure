@@ -23,7 +23,7 @@ env_name = config.get("environment") or "dev"
 location = config.get("location") or "eastus"
 region_abbr = config.get("regionAbbr") or "eus"
 sequence = config.get("sequence") or "001"
-app_version = config.get("appVersion") or "0.2.3"
+app_version = config.get("appVersion") or "0.3.0"
 image_tag = config.get("containerImageTag") or app_version
 image_name = f"aari-nexus-azure:{image_tag}"
 
@@ -325,6 +325,8 @@ container_app = app.ContainerApp(
                     app.EnvironmentVarArgs(name="AZURE_REGION", value=location),
                     app.EnvironmentVarArgs(name="APP_ENV", value=env_name),
                     app.EnvironmentVarArgs(name="APP_VERSION", value=app_version),
+                    app.EnvironmentVarArgs(name="NEXUS_MEMORY_PATH", value="/tmp/nexus_memory.sqlite3"),
+                    app.EnvironmentVarArgs(name="NEXUS_DEBUG_JSON", value="false"),
                 ],
                 resources=app.ContainerResourcesArgs(cpu=0.5, memory="1Gi"),
                 probes=[

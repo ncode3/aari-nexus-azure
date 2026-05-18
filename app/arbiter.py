@@ -6,8 +6,19 @@ from datetime import UTC, datetime
 from typing import Literal
 
 
-ALLOWED_COMMANDS = {"/ping", "/status", "/help", "/brief"}
-GENERATIVE_COMMANDS = {"/brief"}
+ALLOWED_COMMANDS = {
+    "/ping",
+    "/status",
+    "/help",
+    "/brief",
+    "/followup",
+    "/prep",
+    "/draft",
+    "/remember",
+    "/find",
+    "/task",
+}
+GENERATIVE_COMMANDS = {"/brief", "/followup", "/prep", "/draft", "/task"}
 SENSITIVE_KEYS = {
     "api_key",
     "authorization",

@@ -17,17 +17,24 @@ class AzureOpenAIClient:
         )
 
     async def brief(self, prompt: str) -> str:
+        return await self.complete(
+            "You are AARI Nexus Operator. Give concise, direct answers with no fluff.",
+            prompt,
+            max_tokens=300,
+        )
+
+    async def complete(self, system_prompt: str, user_prompt: str, max_tokens: int = 450) -> str:
         response = await asyncio.wait_for(
             self.client.chat.completions.create(
                 model=self.settings.azure_openai_deployment,
                 temperature=0.2,
-                max_tokens=300,
+                max_tokens=max_tokens,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are AARI Nexus Operator. Give concise, direct answers with no fluff.",
+                        "content": system_prompt,
                     },
-                    {"role": "user", "content": prompt},
+                    {"role": "user", "content": user_prompt},
                 ],
             ),
             timeout=self.settings.model_timeout_seconds,
