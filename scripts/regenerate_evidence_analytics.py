@@ -20,6 +20,7 @@ from app.evidence_analytics import (
     build_student_outcomes,
     enhance_coursera,
 )
+from app.weekly_report_ingestion import AHMED_PROCESSED_BLOB
 
 BASELINE_SUMMARY = "analytics/assessments/technical-skills/2026/baseline-summary.json"
 REPORTING_COMPLETENESS = (
@@ -49,10 +50,19 @@ def main() -> int:
     week = read(WEEK1_SOURCE)
     baseline = read(BASELINE_SOURCE)
     coursera = read(COURSERA_SOURCE)
+    supplemental_reports = []
+    try:
+        supplemental_reports.append(read(AHMED_PROCESSED_BLOB))
+    except Exception:
+        pass
     outputs = {
         BASELINE_SUMMARY: build_baseline_summary(baseline),
-        REPORTING_COMPLETENESS: build_reporting_completeness(week),
-        STUDENT_OUTCOMES: build_student_outcomes(week, baseline, coursera),
+        REPORTING_COMPLETENESS: build_reporting_completeness(
+            week, supplemental_reports=supplemental_reports
+        ),
+        STUDENT_OUTCOMES: build_student_outcomes(
+            week, baseline, coursera, supplemental_reports=supplemental_reports
+        ),
         COURSERA_SOURCE: enhance_coursera(coursera),
     }
     if args.output_dir:

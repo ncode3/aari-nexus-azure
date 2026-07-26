@@ -138,6 +138,7 @@ def build_baseline_summary(
 def build_reporting_completeness(
     week: Mapping[str, Any],
     *,
+    supplemental_reports: list[Mapping[str, Any]] | None = None,
     due_date: str = "2026-07-24T15:00:00-04:00",
     last_updated: str | None = None,
 ) -> dict[str, Any]:
@@ -151,25 +152,42 @@ def build_reporting_completeness(
         ("student:jc_thomas", "JC Thomas"),
     ]
     submitted = {student["name"]: student for student in week["students"]}
+    supplements = {
+        report["student_id"]: report for report in (supplemental_reports or [])
+    }
     rows = []
     for student_id, name in expected:
         record = submitted.get(name)
+        supplement = supplements.get(student_id)
+        is_submitted = record is not None or supplement is not None
+        is_approved = bool(record and week["validation"]["passed"]) or bool(
+            supplement and supplement.get("approved")
+        )
         rows.append({
             "cohort_id": "david_mykel_taylor_scholars",
             "student_id": student_id,
             "student_display_name": name,
             "week_number": 1,
             "due_date": due_date,
-            "submitted": record is not None,
-            "submission_timestamp": None,
-            "approved": bool(record and week["validation"]["passed"]),
-            "late": True if record is None else None,
-            "hours_reported": record["hours"] if record else None,
-            "evidence_count": len(record.get("evidence_links", [])) if record else 0,
+            "submitted": is_submitted,
+            "submission_timestamp": supplement.get("submission_timestamp") if supplement else None,
+            "approved": is_approved,
+            "late": True if not is_submitted else None,
+            "hours_reported": record["hours"] if record else (
+                supplement.get("hours_reported") if supplement else None
+            ),
+            "evidence_count": len(record.get("evidence_links", [])) if record else (
+                supplement.get("evidence_count", 0) if supplement else 0
+            ),
             "missing_fields": (
                 ["submission_timestamp"]
                 if record
+                else supplement.get("missing_fields", [])
+                if supplement
                 else ["submission", "submission_timestamp", "hours_reported", "evidence"]
+            ),
+            "source_blob_path": WEEK1_SOURCE if record else (
+                supplement.get("source_blob_path") if supplement else None
             ),
         })
     submitted_count = sum(row["submitted"] for row in rows)
@@ -185,6 +203,9 @@ def build_reporting_completeness(
         "metrics": {
             "expected_reports": evidence_metric(len(rows), "completed", WEEK1_SOURCE, updated),
             "submitted_reports": evidence_metric(submitted_count, "completed", WEEK1_SOURCE, updated),
+            "approved_reports": evidence_metric(
+                sum(row["approved"] for row in rows), "completed", WEEK1_SOURCE, updated
+            ),
             "missing_reports": evidence_metric(len(rows) - submitted_count, "completed", WEEK1_SOURCE, updated),
             "reporting_completion_percent": evidence_metric(
                 round(submitted_count / len(rows) * 100, 2), "completed", WEEK1_SOURCE, updated
@@ -195,8 +216,13 @@ def build_reporting_completeness(
             ),
         },
         "outstanding_students": [
-            {"student_id": row["student_id"], "student_display_name": row["student_display_name"]}
-            for row in rows if not row["submitted"]
+            {
+                "student_id": row["student_id"],
+                "student_display_name": row["student_display_name"],
+                "reason": "missing_report" if not row["submitted"] else "incomplete_report",
+                "missing_fields": row["missing_fields"],
+            }
+            for row in rows if not row["approved"]
         ],
     }
 
@@ -402,14 +428,22 @@ def build_student_outcomes(
     baseline: Mapping[str, Any],
     coursera: Mapping[str, Any],
     *,
+    supplemental_reports: list[Mapping[str, Any]] | None = None,
     last_updated: str | None = None,
 ) -> dict[str, Any]:
     updated = _now(last_updated)
-    reporting = build_reporting_completeness(week, last_updated=updated)
+    reporting = build_reporting_completeness(
+        week, supplemental_reports=supplemental_reports, last_updated=updated
+    )
     activities = build_weekly_activities(week, last_updated=updated)
+    for report in supplemental_reports or []:
+        activities.extend(report.get("activities", []))
     enhanced_coursera = enhance_coursera(coursera, last_updated=updated)
     supported_activities = sum(a["verification_status"] != "reported_only" for a in activities)
-    technical_artifacts = sum(a["artifact_type"] in {"github", "google_document"} for a in activities)
+    technical_artifacts = sum(
+        a["artifact_type"] in {"github", "google_document", "student_artifact"}
+        for a in activities
+    )
     return {
         "schema_version": "2.0",
         "last_updated": updated,
@@ -499,7 +533,7 @@ def build_student_outcomes(
             ),
         },
         "missing_evidence": [
-            "Ahmed H. Kiel-Kamil Week 1 report",
+            "Ahmed H. Kiel-Kamil Week 1 hours, attendance days, and submission timestamp",
             "Per-student Week 1 submission timestamps",
             "Midpoint technical-skills assessment",
             "Final technical-skills assessment",

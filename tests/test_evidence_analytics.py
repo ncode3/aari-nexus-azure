@@ -125,6 +125,28 @@ def test_reporting_completeness_tracks_ahmed_without_adding_hours():
     assert result["outstanding_students"][0]["student_id"] == "student:ahmed_h_kiel_kamil"
 
 
+def test_submitted_incomplete_ahmed_report_closes_missing_report_but_not_verified_hours():
+    supplement = {
+        "student_id": "student:ahmed_h_kiel_kamil",
+        "submitted": True,
+        "approved": False,
+        "submission_timestamp": None,
+        "hours_reported": None,
+        "evidence_count": 3,
+        "missing_fields": ["submission_timestamp", "hours_reported", "attendance_days"],
+        "source_blob_path": "raw/ahmed.docx",
+        "activities": [],
+    }
+    result = build_reporting_completeness(
+        week(), supplemental_reports=[supplement], last_updated=UPDATED
+    )
+    assert result["metrics"]["submitted_reports"]["value"] == 6
+    assert result["metrics"]["missing_reports"]["value"] == 0
+    assert result["metrics"]["approved_reports"]["value"] == 5
+    assert result["metrics"]["verified_hours"]["value"] == 78
+    assert result["outstanding_students"][0]["reason"] == "incomplete_report"
+
+
 def test_narrative_is_not_treated_as_verified_artifact():
     activities = build_weekly_activities(week(), last_updated=UPDATED)
     with_evidence = next(item for item in activities if item["artifact_url"])
