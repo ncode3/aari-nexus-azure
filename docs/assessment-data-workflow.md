@@ -9,7 +9,7 @@ Technical skills surveys are longitudinal program evidence. The workflow preserv
 For cohort `summer-2026-data-center`, year `2026`, and stage `baseline`:
 
 ```text
-raw/20_internal/student-progress/summer-2026-data-center/2026/assessments/baseline/technical-skills-assessment.csv
+raw/20_internal/student-progress/summer-2026-data-center/2026/assessments/baseline/technical-skills-assessment.xlsx
 processed/student-progress/summer-2026-data-center/2026/assessments/baseline/technical-skills-assessment.json
 ```
 
@@ -26,27 +26,33 @@ Every assessment should include:
 
 Without an AARI Student ID, this workflow can measure cohort-level change only. It cannot prove how an individual student changed.
 
+Future forms should preserve the exact scored question text and add an `AARI Student ID`
+column. Pass `--participant-id-column "AARI Student ID"` at every stage. Baseline-to-midpoint
+and baseline-to-final change is calculated by subtracting each baseline aggregate from the later
+aggregate. Individual change is calculated only when the same stable student ID occurs at both
+stages; anonymous responses are never probabilistically matched.
+
 ## Ingestion
 
-Export Google Forms responses as CSV, then run:
+Export Google Forms responses as CSV or XLSX. Uploading is an explicit operation:
 
 ```bash
-python -m scripts.ingest_assessment \
-  ./technical-skills-baseline.csv \
+python scripts/ingest_assessment.py \
+  --input "~/Downloads/Technical Skills Assessment Survey (Responses).xlsx" \
   --cohort summer-2026-data-center \
   --stage baseline \
-  --instrument-version 2026-07 \
-  --participant-id-column "AARI Student ID"
+  --instrument-version 2026-01 \
+  --upload
 ```
 
 To validate locally without uploading:
 
 ```bash
-python -m scripts.ingest_assessment \
-  ./technical-skills-baseline.csv \
+python scripts/ingest_assessment.py \
+  --input "~/Downloads/Technical Skills Assessment Survey (Responses).xlsx" \
   --cohort summer-2026-data-center \
   --stage baseline \
-  --instrument-version 2026-07 \
+  --instrument-version 2026-01 \
   --output ./technical-skills-baseline.json
 ```
 

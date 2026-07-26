@@ -48,13 +48,21 @@ def _as_yes_no(value: object) -> bool:
 
 
 def _as_level(value: object, field_name: str) -> int:
-    level = int(str(value).strip())
+    numeric = float(str(value).strip())
+    if not numeric.is_integer():
+        raise ValueError(f"{field_name} must be a whole-number score")
+    level = int(numeric)
     if level < 1 or level > 5:
         raise ValueError(f"{field_name} must be between 1 and 5")
     return level
 
 
 def _parse_timestamp(value: object) -> str:
+    if isinstance(value, datetime):
+        parsed = value
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC).isoformat()
     text = str(value).strip()
     if not text:
         raise ValueError("Timestamp is required")
@@ -155,6 +163,30 @@ def read_csv_rows(path: str | Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def read_xlsx_rows(path: str | Path) -> list[dict[str, object]]:
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(Path(path), read_only=True, data_only=True)
+    worksheet = workbook.active
+    values = worksheet.iter_rows(values_only=True)
+    headers = next(values, None)
+    if not headers:
+        raise ValueError("Assessment workbook is empty")
+    names = [str(value).strip() if value is not None else "" for value in headers]
+    rows = [dict(zip(names, row, strict=True)) for row in values if any(value is not None for value in row)]
+    workbook.close()
+    return rows
+
+
+def read_assessment_rows(path: str | Path) -> list[dict[str, object]]:
+    source = Path(path).expanduser()
+    if source.suffix.lower() == ".csv":
+        return read_csv_rows(source)
+    if source.suffix.lower() == ".xlsx":
+        return read_xlsx_rows(source)
+    raise ValueError("Assessment input must be a CSV or XLSX file")
+
+
 def build_blob_paths(metadata: AssessmentMetadata, source_suffix: str = ".csv") -> dict[str, str]:
     year = metadata.instrument_version[:4]
     base = f"student-progress/{metadata.cohort_slug}/{year}/assessments/{metadata.assessment_stage}"
@@ -162,6 +194,26 @@ def build_blob_paths(metadata: AssessmentMetadata, source_suffix: str = ".csv") 
         "raw": f"raw/20_internal/{base}/technical-skills-assessment{source_suffix}",
         "processed": f"processed/{base}/technical-skills-assessment.json",
     }
+
+
+def add_ingestion_metadata(
+    package: Mapping[str, Any],
+    source_path: str | Path,
+    metadata: AssessmentMetadata,
+    *,
+    ingested_at: str | None = None,
+) -> dict[str, Any]:
+    source = Path(source_path).expanduser()
+    source_bytes = source.read_bytes()
+    paths = build_blob_paths(metadata, source.suffix.lower())
+    processed = dict(package)
+    processed["ingestion"] = {
+        "ingested_at": ingested_at or datetime.now(UTC).isoformat(),
+        "raw_sha256": hashlib.sha256(source_bytes).hexdigest(),
+        "raw_blob_path": paths["raw"],
+        "processed_blob_path": paths["processed"],
+    }
+    return processed
 
 
 def _blob_service_client(connection_string: str | None, account_url: str | None):
@@ -186,33 +238,55 @@ def upload_assessment_package(
 ) -> dict[str, str]:
     from azure.storage.blob import ContentSettings
 
-    raw_file = Path(raw_path)
+    raw_file = Path(raw_path).expanduser()
     paths = build_blob_paths(metadata, raw_file.suffix.lower())
     client = _blob_service_client(connection_string, account_url)
     container = client.get_container_client(container_name)
 
     raw_bytes = raw_file.read_bytes()
     raw_sha256 = hashlib.sha256(raw_bytes).hexdigest()
-    processed = dict(package)
-    processed["ingestion"] = {
-        "ingested_at": datetime.now(UTC).isoformat(),
-        "raw_sha256": raw_sha256,
-        "raw_blob_path": paths["raw"],
-        "processed_blob_path": paths["processed"],
-    }
+    processed = add_ingestion_metadata(package, raw_file, metadata)
 
     container.upload_blob(
         name=paths["raw"],
         data=raw_bytes,
         overwrite=True,
-        content_settings=ContentSettings(content_type="text/csv"),
-        metadata={"data_classification": "internal", "sha256": raw_sha256},
+        content_settings=ContentSettings(
+            content_type=(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                if raw_file.suffix.lower() == ".xlsx"
+                else "text/csv"
+            )
+        ),
+        metadata={
+            "document_type": "technical_skills_assessment",
+            "assessment_stage": metadata.assessment_stage,
+            "cohort": metadata.cohort_slug,
+            "instrument_version": metadata.instrument_version,
+            "linkage_mode": processed["linkage_mode"],
+            "contains_student_data": "true",
+            "sensitivity": "internal",
+            "public_access": "false",
+            "index_allowed": "false",
+            "sha256": raw_sha256,
+        },
     )
     container.upload_blob(
         name=paths["processed"],
         data=json.dumps(processed, indent=2).encode("utf-8"),
         overwrite=True,
         content_settings=ContentSettings(content_type="application/json"),
-        metadata={"data_classification": "internal", "schema_version": "1.0"},
+        metadata={
+            "document_type": "technical_skills_assessment_normalized",
+            "assessment_stage": metadata.assessment_stage,
+            "cohort": metadata.cohort_slug,
+            "linkage_mode": processed["linkage_mode"],
+            "contains_student_data": "true",
+            "sensitivity": "internal",
+            "public_access": "false",
+            "index_allowed": "false",
+            "schema_version": "1.0",
+            "source_sha256": raw_sha256,
+        },
     )
     return paths
