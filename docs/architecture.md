@@ -1,91 +1,70 @@
-# Architecture
+# Platform Architecture
 
-## Runtime Shape
+## Authoritative services
 
-The container runs one FastAPI process.
+```text
+Gmail / Forms / Excel / CSV / PDFs / APIs
+                    |
+                    v
+          adapter-based ingestion
+ discover -> validate -> checksum -> store -> parse
+       -> normalize -> deduplicate -> lineage -> audit
+             |                         |
+             v                         v
+       PostgreSQL 16                 MinIO
+     structured records          original documents
+             +-----------+-------------+
+                         |
+                      FastAPI
+                    /         \
+          read-only Codex MCP  dashboards
+```
 
-That process exposes:
+PostgreSQL is the structured system of record. MinIO is the binary system of record. Azure may
+run a workflow and stage a file, but submits it over HTTP and receives no persistence credential.
 
-- `/healthz` for Container Apps health checks
-- a background Telegram polling loop for command handling
+## Runtime services
 
-## Components
+- `postgres`: PostgreSQL 16 from the pgvector image, persistent volume, localhost-only
+  development port, application and read-only roles.
+- `minio`: S3-compatible object storage with persistent volume and private document/rejected
+  buckets.
+- `minio-init`: idempotently creates buckets, disables anonymous access, and installs the
+  application’s bucket-scoped policy.
+- `api`: Python 3.12 FastAPI image; runs forward-only Alembic migrations before serving.
+- `redis`: optional `cache` profile, not referenced by normal request handling.
+- `test`: optional `test` profile with disposable integration and backup/restore verification.
 
-### FastAPI App
+## Data model
 
-- starts the bot loop on startup
-- stops the bot loop on shutdown
-- provides the health endpoint
+Canonical identity begins at `people`; students and partner contacts are roles. Cohort,
+attendance, assessment, certification, learning-platform, project, equipment, grant, finance,
+document, workflow, ingestion, and audit tables use UUID keys and relational constraints.
+Financial amounts use fixed-precision numeric columns.
 
-### Arbiter Layer
+Original binaries never enter PostgreSQL. `documents` and `document_versions` point to private
+MinIO objects by bucket and key. `document_chunks` stores extracted text and an optional pgvector
+embedding. The base embedding provider is disabled and requires no external service.
 
-- authorizes supported commands before execution
-- sanitizes `/brief` prompts before model dispatch
-- redacts sensitive log fields and artifact metadata
+Calculated progress, cohort, and financial results are database views rather than copied
+performance fields.
 
-### Telegram Polling Bot
+## API boundary
 
-- calls `getUpdates`
-- parses `/ping`, `/status`, `/help`, `/brief`, `/followup`, `/prep`, `/remember`, `/find`, `/draft`, `/task`
-- replies with `sendMessage`
+The API exposes bounded, versioned operations under `/api/v1`. Uploads are size- and MIME-limited.
+Filenames are sanitized. Request IDs are returned on every response. Search is parameterized and
+result-limited; there is no arbitrary SQL endpoint.
 
-### Nexus Chief-Of-Staff Layer
+## MCP boundary
 
-- classifies command intent
-- retrieves SQLite memory for context-heavy commands
-- routes to MVP agents:
-  - `ChiefOfStaffAgent`
-  - `PartnershipAgent`
-  - `GrantAgent`
-  - `SprintAgent`
-  - `InfrastructureAgent`
-  - `MemoryAgent`
-  - `WritingAgent`
-- generates action packages
-- stores full JSON packages in SQLite
-- renders concise Telegram summaries
-- marks external actions as approval-required instead of executing them
+The MCP process connects as `aari_readonly`. Tools use fixed parameterized statements, cap result
+counts, omit direct contact fields, and exclude restricted documents. Its sole non-SELECT
+permission is a constrained security-definer function that appends an MCP audit event.
 
-Commands that may draft external-facing work, such as `/followup`, `/draft`, and `/task`, produce pending action packages with `APPROVE`, `EDIT`, `TASK`, and `CANCEL` options. No external execution happens in this milestone.
+## Legacy compatibility
 
-### Azure OpenAI Client
+The Telegram operator, Arbiter, Azure OpenAI client, Azure Blob assessment utilities, and Pulumi
+deployment remain in the repository. The Telegram loop starts only when
+`ENABLE_TELEGRAM_BOT=true`; it is not a dependency of the portable platform. SQLite memory is a
+legacy operator store and will be migrated separately rather than silently discarded.
 
-- probes deployment availability
-- sends operational drafting and briefing prompts to the configured Azure OpenAI deployment
-
-### SQLite Memory
-
-- local MVP storage, configured with `NEXUS_MEMORY_PATH`
-- supports people, organizations, projects, decisions, tasks, deadlines, drafts, and action packages
-- exposes `save_memory`, `search_memory`, `list_recent_memory`, `save_action_package`, `get_pending_action`, and `update_action_status`
-
-### Blob Artifact Upload
-
-- optionally writes sanitized `/brief` metadata artifacts to Blob Storage
-
-### Student Intake And Document Flow
-
-- `app/intake.py` represents student intake records and document classification
-- `app/document_flow.py` summarizes resume and supporting document flow without logging document contents
-
-## Azure Resources
-
-- Resource Group
-- User Assigned Managed Identity
-- Azure Container Registry
-- Log Analytics Workspace
-- Application Insights
-- Azure Container Apps Environment
-- Azure Container App
-- Azure Key Vault
-- Azure Storage Account
-
-## Why Polling In V1
-
-Polling is the simplest reliable option for a first Azure deployment:
-
-- no public webhook registration flow
-- no inbound Telegram validation complexity
-- no extra abstraction layer
-
-It is enough to validate bot behavior, container health, and Azure OpenAI integration.
