@@ -82,6 +82,21 @@ python scripts/ingest_assessment.py \
 Never put raw student data under `data/samples` or commit it. `data/incoming`, `data/processed`,
 and `data/rejected` are ignored except for placeholder files.
 
+Ingest the standardized downloaded Week 2 student reports into the private Azure compatibility
+store, preserving conflicting source provenance without double-counting it:
+
+```bash
+AZURE_STORAGE_ACCOUNT_URL=https://<account>.blob.core.windows.net \
+  python scripts/ingest_student_reports.py --downloads "$HOME/Downloads" --upload
+
+AZURE_STORAGE_ACCOUNT_URL=https://<account>.blob.core.windows.net \
+  python scripts/regenerate_student_report_analytics.py \
+  --downloads "$HOME/Downloads" --upload
+```
+
+Both commands default to the private `artifacts` container, use `DefaultAzureCredential`, classify
+student data as internal, and set `index_allowed=false`.
+
 ## API
 
 Interactive OpenAPI documentation is available at `http://localhost:8000/docs`. Versioned routes

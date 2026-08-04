@@ -2,7 +2,9 @@ PYTHON ?= .venv/bin/python
 COMPOSE ?= docker compose
 PLATFORM_PATHS = app/api app/core app/db app/ingestion app/models app/repositories \
 	app/schemas app/services app/main.py mcp_server migrations scripts/import_directory.py \
-	scripts/seed_demo_data.py scripts/submit_from_azure.py scripts/verify_environment.py \
+	app/student_report_flow.py scripts/seed_demo_data.py scripts/submit_from_azure.py \
+	scripts/ingest_student_reports.py scripts/regenerate_student_report_analytics.py \
+	scripts/verify_environment.py \
 	tests/unit tests/integration
 
 .PHONY: setup up down logs migrate migration seed test lint format import backup restore
@@ -37,7 +39,9 @@ test:
 lint:
 	$(PYTHON) -m ruff check $(PLATFORM_PATHS)
 	$(PYTHON) -m mypy app/api app/core app/db app/ingestion app/models \
-		app/repositories app/schemas app/services app/main.py mcp_server
+		app/repositories app/schemas app/services app/main.py app/student_report_flow.py \
+		mcp_server scripts/ingest_student_reports.py \
+		scripts/regenerate_student_report_analytics.py
 
 format:
 	$(PYTHON) -m ruff format $(PLATFORM_PATHS)
