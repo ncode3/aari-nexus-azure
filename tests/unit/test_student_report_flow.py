@@ -75,3 +75,19 @@ def test_week_three_analytics_records_missing_grayson_report() -> None:
         "Grayson Roper"
     ]
     assert output["cumulative_through_week_3"]["verified_hours"] == 234
+
+
+def test_week_three_data_center_report_extracts_ahmed_artifacts() -> None:
+    source = DOWNLOADS / "Progress Report 3.pdf"
+    if not source.exists():
+        return
+    package = parse_data_center_report(source)
+    assert package["page_count"] == 2
+    assert package["week_number"] == 3
+    assert len(package["members"]) == 4
+    ahmed = next(
+        member for member in package["members"] if member["reported_name"] == "Ahmed Kiel-Kamil"
+    )
+    assert len(ahmed["artifact_urls"]) == 10
+    assert ahmed["verification_status"] == "evidence_submitted"
+    assert package["verified_hours"] is None

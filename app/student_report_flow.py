@@ -189,9 +189,19 @@ def parse_individual_progress_log(path: Path) -> dict[str, Any]:
 
 def parse_data_center_report(path: Path) -> dict[str, Any]:
     text, pages = pdf_text(path)
-    member_names = ("Grayson", "Butler", "Ryans", "Ahmed")
+    member_names = (
+        "Charles Ryans",
+        "Grayson Roper",
+        "Charles Butler",
+        "Ahmed Kiel-Kamil",
+        "Grayson",
+        "Butler",
+        "Ryans",
+        "Ahmed",
+    )
+    name_patterns = [re.escape(name).replace(r"\ ", r"\s+") for name in member_names]
     member_pattern = re.compile(
-        rf"\b({'|'.join(member_names)}):\s*", re.IGNORECASE
+        rf"\b({'|'.join(name_patterns)})\s*[-:]\s*", re.IGNORECASE
     )
     matches = list(member_pattern.finditer(text))
     members = []
@@ -200,7 +210,7 @@ def parse_data_center_report(path: Path) -> dict[str, Any]:
         body = text[match.end() : end]
         members.append(
             {
-                "reported_name": match.group(1),
+                "reported_name": " ".join(match.group(1).split()),
                 "reported_description": " ".join(body.split()),
                 "artifact_urls": _urls(body),
                 "hours": None,
@@ -217,7 +227,7 @@ def parse_data_center_report(path: Path) -> dict[str, Any]:
         "source_filename": path.name,
         "source_sha256": file_sha256(path),
         "page_count": pages,
-        "week_number": 2,
+        "week_number": 3 if re.search(r"(?:Report|Week)\s*3", text, re.I) else 2,
         "members": members,
         "artifact_urls": _urls(text),
         "verified_hours": None,

@@ -117,6 +117,19 @@ def routes(
             ),
             parse_individual_progress_log,
         ),
+        (
+            downloads / "Progress Report 3.pdf",
+            ReportRoute(
+                "raw/20_internal/student-progress/summer-2026-data-center/2026/"
+                "week-03/progress-report-3.pdf",
+                "processed/student-progress/summer-2026-data-center/2026/"
+                "week-03/progress-report-3.json",
+                "summer_2026_data_center",
+                3,
+                "data_center_progress_report",
+            ),
+            parse_data_center_report,
+        ),
     ]
 
 
