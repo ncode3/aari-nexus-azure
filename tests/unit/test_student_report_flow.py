@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.student_report_flow import (
+    build_week_three_analytics,
     build_week_two_analytics,
     parse_data_center_report,
     parse_individual_progress_log,
@@ -60,3 +61,17 @@ def test_week_two_analytics_separates_verified_and_missing_hours() -> None:
     )
     assert output["scholar_cohort"]["reporting_completeness"]["completion_percent"] == 100
     assert output["data_center_cohort"]["verified_hours"] is None
+
+
+def test_week_three_analytics_records_missing_grayson_report() -> None:
+    source = DOWNLOADS / "cohort-progress-report (1).pdf"
+    if not source.exists():
+        return
+    output = build_week_three_analytics(parse_scholar_cohort_report(source))
+    assert output["week_3"]["verified_hours"] == 60
+    assert output["week_3"]["verified_participant_days"] == 16
+    assert output["reporting_completeness"]["week_3_submitted_reports"] == 4
+    assert output["reporting_completeness"]["week_3_missing_students"] == [
+        "Grayson Roper"
+    ]
+    assert output["cumulative_through_week_3"]["verified_hours"] == 234

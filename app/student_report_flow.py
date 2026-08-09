@@ -349,3 +349,76 @@ def build_week_two_analytics(
             },
         ],
     }
+
+
+def build_week_three_analytics(cohort_report: dict[str, Any]) -> dict[str, Any]:
+    week_ending = "2026-08-07"
+    latest = [
+        record
+        for record in cohort_report["weekly_records"]
+        if record["week_ending"] == week_ending
+    ]
+    totals = cohort_report["aggregate_totals"]
+    expected_student_weeks = len(totals) * 3
+    submitted_student_weeks = sum(item["weeks_filed"] for item in totals)
+    submitted_names = {record["student_name"] for record in latest}
+    missing = [name for name in SCHOLAR_NAMES if name not in submitted_names]
+    return {
+        "schema_version": "1.0",
+        "last_updated": datetime.now(UTC).isoformat(),
+        "privacy": {
+            "classification": "internal",
+            "contains_student_data": True,
+            "public_reporting": "aggregate_only",
+        },
+        "source_records": [
+            {
+                "blob_path": (
+                    "processed/student-progress/david_mykel_taylor_scholars/2026/"
+                    "week-03/cohort-progress-report.json"
+                ),
+                "sha256": cohort_report["source_sha256"],
+                "evidence_status": "completed",
+            }
+        ],
+        "reporting_completeness": {
+            "expected_student_weeks": expected_student_weeks,
+            "submitted_student_weeks": submitted_student_weeks,
+            "completion_percent": round(
+                submitted_student_weeks / expected_student_weeks * 100, 1
+            ),
+            "week_3_expected_reports": len(totals),
+            "week_3_submitted_reports": len(latest),
+            "week_3_missing_students": missing,
+            "evidence_status": "completed",
+        },
+        "week_3": {
+            "verified_hours": sum(record["hours"] for record in latest),
+            "verified_participant_days": sum(record["days"] for record in latest),
+            "students_reporting": len(latest),
+            "evidence_links": sum(len(record["evidence_urls"]) for record in latest),
+            "student_records": [
+                {
+                    "student_name": record["student_name"],
+                    "hours": record["hours"],
+                    "days": record["days"],
+                    "evidence_links": len(record["evidence_urls"]),
+                    "evidence_status": "completed",
+                }
+                for record in latest
+            ],
+        },
+        "cumulative_through_week_3": {
+            "verified_hours": sum(item["total_hours"] for item in totals),
+            "verified_participant_days": sum(item["total_days"] for item in totals),
+            "student_totals": totals,
+        },
+        "quality_flags": [
+            {
+                "type": "missing_weekly_report",
+                "student": name,
+                "week_ending": week_ending,
+            }
+            for name in missing
+        ],
+    }

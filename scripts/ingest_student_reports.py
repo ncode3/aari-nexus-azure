@@ -91,6 +91,32 @@ def routes(
             ),
             parse_data_center_report,
         ),
+        (
+            downloads / "cohort-progress-report (1).pdf",
+            ReportRoute(
+                "raw/20_internal/student-progress/david_mykel_taylor_scholars/2026/"
+                "week-03/cohort-progress-report.pdf",
+                "processed/student-progress/david_mykel_taylor_scholars/2026/"
+                "week-03/cohort-progress-report.json",
+                "david_mykel_taylor_scholars",
+                3,
+                "cohort_progress_report",
+            ),
+            parse_scholar_cohort_report,
+        ),
+        (
+            downloads / "rasheed-jeheeb-progress-log (3).pdf",
+            ReportRoute(
+                "raw/20_internal/student-progress/david_mykel_taylor_scholars/2026/"
+                "week-03/individual/rasheed-jeheeb-progress-log.pdf",
+                "processed/student-progress/david_mykel_taylor_scholars/2026/"
+                "week-03/individual/rasheed-jeheeb-progress-log.json",
+                "david_mykel_taylor_scholars",
+                3,
+                "individual_progress_log",
+            ),
+            parse_individual_progress_log,
+        ),
     ]
 
 
@@ -100,8 +126,13 @@ def main() -> None:
     parser.add_argument("--account-url", default=os.getenv("AZURE_STORAGE_ACCOUNT_URL"))
     parser.add_argument("--container", default=os.getenv("AZURE_STORAGE_CONTAINER", "artifacts"))
     parser.add_argument("--upload", action="store_true")
+    parser.add_argument("--week-number", type=int, choices=[2, 3])
     args = parser.parse_args()
-    selected = routes(args.downloads.expanduser())
+    selected = [
+        item
+        for item in routes(args.downloads.expanduser())
+        if args.week_number is None or item[1].week_number == args.week_number
+    ]
     missing = [str(path) for path, _, _ in selected if not path.is_file()]
     if missing:
         raise FileNotFoundError("Missing report files: " + ", ".join(missing))
