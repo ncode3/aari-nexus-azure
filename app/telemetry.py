@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from io import BytesIO
 
 from azure.identity import DefaultAzureCredential
-from azure.monitor.opentelemetry import configure_azure_monitor
 from azure.storage.blob import BlobServiceClient
 
 from app.arbiter import NexusArbiter
@@ -24,6 +23,8 @@ def configure_logging(settings: Settings) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     if settings.app_insights_connection_string:
+        from azure.monitor.opentelemetry import configure_azure_monitor
+
         configure_azure_monitor(connection_string=settings.app_insights_connection_string)
 
 
