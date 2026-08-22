@@ -7,9 +7,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient, ContentSettings
-
 from app.student_report_flow import (
     ReportRoute,
     parse_data_center_report,
@@ -20,6 +17,8 @@ from app.student_report_flow import (
 
 
 def upload_idempotent(container, path: str, payload: bytes, content_type: str, metadata: dict):
+    from azure.storage.blob import ContentSettings
+
     blob = container.get_blob_client(path)
     if blob.exists():
         properties = blob.get_blob_properties()
@@ -130,6 +129,33 @@ def routes(
             ),
             parse_data_center_report,
         ),
+        (
+            downloads / "cohort-progress-report (3).pdf",
+            ReportRoute(
+                "raw/20_internal/student-progress/david_mykel_taylor_scholars/2026/"
+                "week-05/cohort-progress-report.pdf",
+                "processed/student-progress/david_mykel_taylor_scholars/2026/"
+                "week-05/cohort-progress-report.json",
+                "david_mykel_taylor_scholars",
+                5,
+                "cohort_progress_report",
+            ),
+            parse_scholar_cohort_report,
+        ),
+        (
+            downloads / "rasheed-jeheeb-progress-log (4).pdf",
+            ReportRoute(
+                "raw/20_internal/student-progress/david_mykel_taylor_scholars/2026/"
+                "week-05/individual/rasheed-jeheeb-progress-log.pdf",
+                "processed/student-progress/david_mykel_taylor_scholars/2026/"
+                "week-05/individual/rasheed-jeheeb-progress-log.json",
+                "david_mykel_taylor_scholars",
+                5,
+                "individual_progress_log",
+                "supporting_source",
+            ),
+            parse_individual_progress_log,
+        ),
     ]
 
 
@@ -139,7 +165,7 @@ def main() -> None:
     parser.add_argument("--account-url", default=os.getenv("AZURE_STORAGE_ACCOUNT_URL"))
     parser.add_argument("--container", default=os.getenv("AZURE_STORAGE_CONTAINER", "artifacts"))
     parser.add_argument("--upload", action="store_true")
-    parser.add_argument("--week-number", type=int, choices=[2, 3])
+    parser.add_argument("--week-number", type=int, choices=[2, 3, 5])
     args = parser.parse_args()
     selected = [
         item
@@ -153,6 +179,9 @@ def main() -> None:
     if args.upload:
         if not args.account_url:
             raise ValueError("--account-url or AZURE_STORAGE_ACCOUNT_URL is required")
+        from azure.identity import DefaultAzureCredential
+        from azure.storage.blob import BlobServiceClient
+
         client = BlobServiceClient(
             account_url=args.account_url, credential=DefaultAzureCredential()
         ).get_container_client(args.container)

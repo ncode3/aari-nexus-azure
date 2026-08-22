@@ -4,13 +4,12 @@ import argparse
 import os
 from pathlib import Path
 
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient, ContentSettings
-
 from app.student_report_flow import (
+    build_week_five_analytics,
     build_week_three_analytics,
     build_week_two_analytics,
     parse_data_center_report,
+    parse_individual_progress_log,
     parse_scholar_cohort_report,
     serialize_report,
 )
@@ -25,17 +24,31 @@ WEEK_3_REPORT_PATH = (
     "reports/student-progress/david_mykel_taylor_scholars/2026/week-03/"
     "cohort-summary.json"
 )
+WEEK_5_ANALYTICS_PATH = "analytics/student-outcomes/2026/week-05-summary.json"
+WEEK_5_REPORT_PATH = (
+    "reports/student-progress/david_mykel_taylor_scholars/2026/week-05/"
+    "cohort-summary.json"
+)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Regenerate Week 2 student analytics")
+    parser = argparse.ArgumentParser(description="Regenerate weekly student analytics")
     parser.add_argument("--downloads", type=Path, default=Path("~/Downloads").expanduser())
     parser.add_argument("--account-url", default=os.getenv("AZURE_STORAGE_ACCOUNT_URL"))
     parser.add_argument("--container", default=os.getenv("AZURE_STORAGE_CONTAINER", "artifacts"))
     parser.add_argument("--upload", action="store_true")
-    parser.add_argument("--week-number", type=int, choices=[2, 3], default=2)
+    parser.add_argument("--week-number", type=int, choices=[2, 3, 5], default=2)
     args = parser.parse_args()
-    if args.week_number == 3:
+    if args.week_number == 5:
+        cohort = parse_scholar_cohort_report(
+            args.downloads / "cohort-progress-report (3).pdf"
+        )
+        individual = parse_individual_progress_log(
+            args.downloads / "rasheed-jeheeb-progress-log (4).pdf"
+        )
+        output = build_week_five_analytics(cohort, individual)
+        output_paths = (WEEK_5_ANALYTICS_PATH, WEEK_5_REPORT_PATH)
+    elif args.week_number == 3:
         cohort = parse_scholar_cohort_report(
             args.downloads / "cohort-progress-report (1).pdf"
         )
@@ -50,6 +63,9 @@ def main() -> None:
     if args.upload:
         if not args.account_url:
             raise ValueError("--account-url or AZURE_STORAGE_ACCOUNT_URL is required")
+        from azure.identity import DefaultAzureCredential
+        from azure.storage.blob import BlobServiceClient, ContentSettings
+
         container = BlobServiceClient(
             account_url=args.account_url, credential=DefaultAzureCredential()
         ).get_container_client(args.container)
@@ -74,11 +90,15 @@ def main() -> None:
             "analytics_path": output_paths[0],
             "report_path": output_paths[1],
             "verified_hours": (
-                output["cumulative_through_week_3"]["verified_hours"]
-                if args.week_number == 3
-                else output["scholar_cohort"]["cumulative_through_week_2"][
-                    "verified_hours"
-                ]
+                output["cumulative_through_week_5"]["verified_hours"]
+                if args.week_number == 5
+                else (
+                    output["cumulative_through_week_3"]["verified_hours"]
+                    if args.week_number == 3
+                    else output["scholar_cohort"]["cumulative_through_week_2"][
+                        "verified_hours"
+                    ]
+                )
             ),
         }
     )

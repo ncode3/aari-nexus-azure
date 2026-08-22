@@ -17,6 +17,7 @@ SCHOLAR_NAMES = (
     "Winston Doss",
     "Grayson Roper",
     "JC Thomas",
+    "Charles Butler III",
 )
 SECTION_NAMES = (
     "WORK COMPLETED & CONTRIBUTION",
@@ -96,7 +97,7 @@ def parse_scholar_cohort_report(path: Path) -> dict[str, Any]:
     week_chunks = re.split(r"(?=Week ending Friday, [A-Z][a-z]+ \d{1,2}, \d{4})", text)
     record_pattern = re.compile(
         rf"(?m)^({'|'.join(re.escape(name) for name in SCHOLAR_NAMES)})\s*$"
-        r"\s*Hours\s+([\d.]+)\s*\nDays\s+(\d+)"
+        r"\s*Hours\s+([\d.]+)\s*\nDays\s+(\d+|[—–-])"
     )
     for chunk in week_chunks:
         ending = re.search(r"Week ending Friday, ([A-Z][a-z]+ \d{1,2}, \d{4})", chunk)
@@ -113,7 +114,11 @@ def parse_scholar_cohort_report(path: Path) -> dict[str, Any]:
                         ending.group(1), "%B %d, %Y"
                     ).date().isoformat(),
                     "hours": float(match.group(2)),
-                    "days": int(match.group(3)),
+                    "days": (
+                        None
+                        if re.fullmatch(r"[—–-]", match.group(3))
+                        else int(match.group(3))
+                    ),
                     "work_completed": _section(body, "WORK COMPLETED & CONTRIBUTION"),
                     "skills_gained": _section(body, "SKILL GAINED"),
                     "problem_and_resolution": _section(body, "PROBLEM & RESOLUTION"),
@@ -372,7 +377,8 @@ def build_week_three_analytics(cohort_report: dict[str, Any]) -> dict[str, Any]:
     expected_student_weeks = len(totals) * 3
     submitted_student_weeks = sum(item["weeks_filed"] for item in totals)
     submitted_names = {record["student_name"] for record in latest}
-    missing = [name for name in SCHOLAR_NAMES if name not in submitted_names]
+    expected_names = [item["student_name"] for item in totals]
+    missing = [name for name in expected_names if name not in submitted_names]
     return {
         "schema_version": "1.0",
         "last_updated": datetime.now(UTC).isoformat(),
@@ -431,4 +437,169 @@ def build_week_three_analytics(cohort_report: dict[str, Any]) -> dict[str, Any]:
             }
             for name in missing
         ],
+    }
+
+
+def build_week_five_analytics(
+    cohort_report: dict[str, Any], individual_report: dict[str, Any]
+) -> dict[str, Any]:
+    week_number = 5
+    week_ending = "2026-08-21"
+    latest = [
+        record
+        for record in cohort_report["weekly_records"]
+        if record["week_ending"] == week_ending
+    ]
+    totals = cohort_report["aggregate_totals"]
+    expected_names = [item["student_name"] for item in totals]
+    submitted_names = {record["student_name"] for record in latest}
+    missing = [name for name in expected_names if name not in submitted_names]
+    missing_days = [
+        record["student_name"] for record in latest if record["days"] is None
+    ]
+    expected_student_weeks = len(totals) * week_number
+    submitted_student_weeks = sum(item["weeks_filed"] for item in totals)
+    historical_gaps = [
+        {
+            "student_name": item["student_name"],
+            "missing_student_weeks": week_number - item["weeks_filed"],
+        }
+        for item in totals
+        if item["weeks_filed"] < week_number
+    ]
+
+    supporting = next(
+        (
+            record
+            for record in individual_report["weekly_records"]
+            if record["week_ending"] == week_ending
+        ),
+        None,
+    )
+    cohort_rasheed = next(
+        (record for record in latest if record["student_name"] == "Rasheed Jeheeb"),
+        None,
+    )
+    supporting_matches = bool(
+        supporting
+        and cohort_rasheed
+        and supporting["hours"] == cohort_rasheed["hours"]
+        and supporting["days"] == cohort_rasheed["days"]
+    )
+
+    quality_flags: list[dict[str, Any]] = [
+        {
+            "type": "missing_weekly_report",
+            "student": name,
+            "week_ending": week_ending,
+        }
+        for name in missing
+    ]
+    quality_flags.extend(
+        {
+            "type": "attendance_days_missing",
+            "student": name,
+            "week_ending": week_ending,
+            "detail": "Hours are reported, but attendance days are not provided.",
+        }
+        for name in missing_days
+    )
+    quality_flags.extend(
+        {
+            "type": "historical_student_week_gap",
+            **gap,
+            "detail": "The cumulative source reports fewer filed weeks than the current cohort week.",
+        }
+        for gap in historical_gaps
+    )
+    if not supporting_matches:
+        quality_flags.append(
+            {
+                "type": "supporting_source_mismatch",
+                "student": "Rasheed Jeheeb",
+                "week_ending": week_ending,
+                "detail": "The individual report does not match the authoritative cohort record.",
+            }
+        )
+
+    return {
+        "schema_version": "1.0",
+        "last_updated": datetime.now(UTC).isoformat(),
+        "privacy": {
+            "classification": "internal",
+            "contains_student_data": True,
+            "public_reporting": "aggregate_only",
+        },
+        "source_records": [
+            {
+                "blob_path": (
+                    "processed/student-progress/david_mykel_taylor_scholars/2026/"
+                    "week-05/cohort-progress-report.json"
+                ),
+                "sha256": cohort_report["source_sha256"],
+                "role": "authoritative_aggregate",
+                "counted_in_aggregate": True,
+                "evidence_status": "completed",
+            },
+            {
+                "blob_path": (
+                    "processed/student-progress/david_mykel_taylor_scholars/2026/"
+                    "week-05/individual/rasheed-jeheeb-progress-log.json"
+                ),
+                "sha256": individual_report["source_sha256"],
+                "role": "supporting_source",
+                "counted_in_aggregate": False,
+                "evidence_status": (
+                    "corroborates_authoritative_source"
+                    if supporting_matches
+                    else "conflict_requires_review"
+                ),
+            },
+        ],
+        "reporting_completeness": {
+            "expected_student_weeks": expected_student_weeks,
+            "submitted_student_weeks": submitted_student_weeks,
+            "completion_percent": round(
+                submitted_student_weeks / expected_student_weeks * 100, 1
+            ),
+            "week_5_expected_reports": len(expected_names),
+            "week_5_submitted_reports": len(latest),
+            "week_5_missing_students": missing,
+            "historical_student_week_gaps": historical_gaps,
+            "evidence_status": "completed",
+        },
+        "week_5": {
+            "verified_hours": sum(record["hours"] for record in latest),
+            "verified_participant_days": sum(
+                record["days"] for record in latest if record["days"] is not None
+            ),
+            "participant_days_missing_for": missing_days,
+            "students_reporting": len(latest),
+            "evidence_links": sum(len(record["evidence_urls"]) for record in latest),
+            "student_records": [
+                {
+                    "student_name": record["student_name"],
+                    "hours": record["hours"],
+                    "days": record["days"],
+                    "evidence_links": len(record["evidence_urls"]),
+                    "hours_evidence_status": "completed",
+                    "days_evidence_status": (
+                        "missing" if record["days"] is None else "completed"
+                    ),
+                }
+                for record in latest
+            ],
+        },
+        "cumulative_through_week_5": {
+            "verified_hours": sum(item["total_hours"] for item in totals),
+            "verified_participant_days": sum(item["total_days"] for item in totals),
+            "student_totals": totals,
+        },
+        "supporting_source_check": {
+            "student": "Rasheed Jeheeb",
+            "week_ending": week_ending,
+            "matches_authoritative_source": supporting_matches,
+            "counted_in_aggregate": False,
+        },
+        "quality_flags": quality_flags,
     }

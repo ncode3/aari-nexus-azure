@@ -1,6 +1,8 @@
 from pathlib import Path
+from unittest.mock import patch
 
 from app.student_report_flow import (
+    build_week_five_analytics,
     build_week_three_analytics,
     build_week_two_analytics,
     parse_data_center_report,
@@ -44,6 +46,134 @@ def test_data_center_report_does_not_invent_hours() -> None:
     assert package["verified_hours"] is None
     assert all(member["hours"] is None for member in package["members"])
     assert len(package["artifact_urls"]) == 6
+
+
+def test_parser_accepts_charles_and_missing_attendance_days() -> None:
+    text = """Reporting period: July 24 - September 4, 2026
+Compiled August 21, 2026
+Prepared by Winston Doss
+Charles Butler III
+3 / 7
+18
+15
+Week ending Friday, August 21, 2026
+JC Thomas
+Hours 5
+Days —
+WORK COMPLETED & CONTRIBUTION
+Flashed the Raspberry Pi firmware.
+SKILL GAINED
+Hardware setup.
+PROBLEM & RESOLUTION
+Resolved a display issue.
+EMPLOYER / MENTOR INTERACTION
+None this week.
+NEXT WEEK'S DELIVERABLE
+Complete the robot.
+Charles Butler III
+Hours 6
+Days 5
+WORK COMPLETED & CONTRIBUTION
+Completed the security orchestration dashboard.
+SKILL GAINED
+Integrated Cursor.
+PROBLEM & RESOLUTION
+Managed token limits.
+EMPLOYER / MENTOR INTERACTION
+Camille Balli and Milton Walker.
+NEXT WEEK'S DELIVERABLE
+Improve the threat map.
+"""
+    with (
+        patch("app.student_report_flow.pdf_text", return_value=(text, 1)),
+        patch("app.student_report_flow.file_sha256", return_value="abc123"),
+    ):
+        package = parse_scholar_cohort_report(Path("report.pdf"))
+    assert package["aggregate_totals"] == [
+        {
+            "student_name": "Charles Butler III",
+            "weeks_filed": 3,
+            "weeks_expected": 7,
+            "total_hours": 18.0,
+            "total_days": 15,
+        }
+    ]
+    records = package["weekly_records"]
+    assert [record["student_name"] for record in records] == [
+        "JC Thomas",
+        "Charles Butler III",
+    ]
+    assert records[0]["hours"] == 5
+    assert records[0]["days"] is None
+    assert records[1]["days"] == 5
+
+
+def test_week_five_analytics_deduplicates_supporting_report() -> None:
+    totals = [
+        ("Javion Postell", 62, 22, 5),
+        ("Rasheed Jeheeb", 67, 22, 5),
+        ("Winston Doss", 69.5, 20, 5),
+        ("Grayson Roper", 100, 25, 5),
+        ("JC Thomas", 80, 16, 5),
+        ("Charles Butler III", 18, 15, 3),
+    ]
+    week = [
+        ("Javion Postell", 10, 5),
+        ("Rasheed Jeheeb", 14, 5),
+        ("Winston Doss", 8, 4),
+        ("Grayson Roper", 20, 5),
+        ("JC Thomas", 5, None),
+        ("Charles Butler III", 6, 5),
+    ]
+    cohort = {
+        "source_sha256": "cohort-sha",
+        "aggregate_totals": [
+            {
+                "student_name": name,
+                "weeks_filed": filed,
+                "weeks_expected": 7,
+                "total_hours": hours,
+                "total_days": days,
+            }
+            for name, hours, days, filed in totals
+        ],
+        "weekly_records": [
+            {
+                "student_name": name,
+                "week_ending": "2026-08-21",
+                "hours": hours,
+                "days": days,
+                "evidence_urls": [],
+            }
+            for name, hours, days in week
+        ],
+    }
+    individual = {
+        "source_sha256": "individual-sha",
+        "weekly_records": [
+            {
+                "student_name": "Rasheed Jeheeb",
+                "week_ending": "2026-08-21",
+                "hours": 14,
+                "days": 5,
+                "evidence_urls": [],
+            }
+        ],
+    }
+    output = build_week_five_analytics(cohort, individual)
+    assert output["week_5"]["verified_hours"] == 63
+    assert output["week_5"]["verified_participant_days"] == 24
+    assert output["week_5"]["participant_days_missing_for"] == ["JC Thomas"]
+    assert output["cumulative_through_week_5"]["verified_hours"] == 396.5
+    assert output["cumulative_through_week_5"]["verified_participant_days"] == 120
+    assert output["reporting_completeness"]["submitted_student_weeks"] == 28
+    assert output["reporting_completeness"]["completion_percent"] == 93.3
+    assert output["supporting_source_check"] == {
+        "student": "Rasheed Jeheeb",
+        "week_ending": "2026-08-21",
+        "matches_authoritative_source": True,
+        "counted_in_aggregate": False,
+    }
 
 
 def test_week_two_analytics_separates_verified_and_missing_hours() -> None:
