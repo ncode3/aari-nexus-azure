@@ -1,8 +1,165 @@
+name: aari-data-platform
+
 services:
-  nexus:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aari}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-aari_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-local-admin-change-me}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-aari_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-local-app-change-me}
+      POSTGRES_READONLY_USER: ${POSTGRES_READONLY_USER:-aari_readonly}
+      POSTGRES_READONLY_PASSWORD: ${POSTGRES_READONLY_PASSWORD:-local-readonly-change-me}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-aari_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-minio-change-me}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-aari_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-minio-change-me}
+      MINIO_DOCUMENTS_BUCKET: ${MINIO_DOCUMENTS_BUCKET:-aari-documents}
+      MINIO_REJECTED_BUCKET: ${MINIO_REJECTED_BUCKET:-aari-rejected}
+      MINIO_APP_USER: ${MINIO_APP_USER:-aari_app}
+      MINIO_APP_PASSWORD: ${MINIO_APP_PASSWORD:-local-minio-app-change-me}
+    volumes:
+      - ./docker/minio/aari-app-policy.json:/policies/aari-app-policy.json:ro
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        mc mb --ignore-existing "local/$${MINIO_DOCUMENTS_BUCKET}"
+        mc mb --ignore-existing "local/$${MINIO_REJECTED_BUCKET}"
+        mc anonymous set none "local/$${MINIO_DOCUMENTS_BUCKET}"
+        mc anonymous set none "local/$${MINIO_REJECTED_BUCKET}"
+        mc admin user add local "$${MINIO_APP_USER}" "$${MINIO_APP_PASSWORD}" || true
+        mc admin policy create local aari-app /policies/aari-app-policy.json || true
+        mc admin policy attach local aari-app --user "$${MINIO_APP_USER}"
+    networks: [private]
+    restart: "no"
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_APP_USER:-aari_app}:${POSTGRES_APP_PASSWORD:-local-app-change-me}@postgres:5432/${POSTGRES_DB:-aari}
+      DATABASE_ADMIN_URL: postgresql+psycopg://${POSTGRES_ADMIN_USER:-aari_admin}:${POSTGRES_ADMIN_PASSWORD:-local-admin-change-me}@postgres:5432/${POSTGRES_DB:-aari}
+      READONLY_DATABASE_URL: postgresql+psycopg://${POSTGRES_READONLY_USER:-aari_readonly}:${POSTGRES_READONLY_PASSWORD:-local-readonly-change-me}@postgres:5432/${POSTGRES_DB:-aari}
+      POSTGRES_READONLY_USER: ${POSTGRES_READONLY_USER:-aari_readonly}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_APP_USER:-aari_app}
+      MINIO_SECRET_KEY: ${MINIO_APP_PASSWORD:-local-minio-app-change-me}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-aari_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-minio-change-me}
+      MINIO_DOCUMENTS_BUCKET: ${MINIO_DOCUMENTS_BUCKET:-aari-documents}
+      MINIO_REJECTED_BUCKET: ${MINIO_REJECTED_BUCKET:-aari-rejected}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["cache"]
+    command: redis-server --appendonly yes
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [private]
+
+  test:
     build:
       context: .
-    env_file:
-      - .env
-    ports:
-      - "8000:8000"
+      args:
+        INSTALL_DEV: "true"
+    profiles: ["test"]
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        alembic upgrade head
+        ./scripts/create_readonly_user.sh
+        RUN_INTEGRATION=1 pytest
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_APP_USER:-aari_app}:${POSTGRES_APP_PASSWORD:-local-app-change-me}@postgres:5432/${POSTGRES_DB:-aari}
+      DATABASE_ADMIN_URL: postgresql+psycopg://${POSTGRES_ADMIN_USER:-aari_admin}:${POSTGRES_ADMIN_PASSWORD:-local-admin-change-me}@postgres:5432/${POSTGRES_DB:-aari}
+      READONLY_DATABASE_URL: postgresql+psycopg://${POSTGRES_READONLY_USER:-aari_readonly}:${POSTGRES_READONLY_PASSWORD:-local-readonly-change-me}@postgres:5432/${POSTGRES_DB:-aari}
+      POSTGRES_READONLY_USER: ${POSTGRES_READONLY_USER:-aari_readonly}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_APP_USER:-aari_app}
+      MINIO_SECRET_KEY: ${MINIO_APP_PASSWORD:-local-minio-app-change-me}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-aari_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-minio-change-me}
+      MINIO_DOCUMENTS_BUCKET: ${MINIO_DOCUMENTS_BUCKET:-aari-documents}
+      MINIO_REJECTED_BUCKET: ${MINIO_REJECTED_BUCKET:-aari-rejected}
+      RUN_INTEGRATION: "1"
+      API_INTERNAL_URL: http://api:8000
+    networks: [private]
+
+networks:
+  private:
+    internal: false
+
+volumes:
+  postgres_data:
+  minio_data:
+  redis_data:

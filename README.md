@@ -1,269 +1,157 @@
-# AARI Nexus Azure
+# AARI Portable Data Platform
 
-AARI Nexus Operator rebuilt for Azure.
+This repository provides the self-hosted system of record for the Atlanta AI & Robotics
+Initiative. PostgreSQL 16 stores normalized program data, MinIO stores original documents,
+FastAPI exposes bounded application operations, and a separate read-only MCP server gives Codex
+controlled access. Azure can submit work through HTTP, but no cloud database is authoritative.
 
-This repo deploys a private AARI Nexus Telegram backend to Azure Container Apps with:
+The former Azure/Telegram modules remain in place as optional compatibility code. They are not
+required to start or operate the base platform.
 
-- FastAPI runtime
-- Telegram polling bot
-- Azure OpenAI for operational drafting and briefs
-- SQLite memory and action packages for the MVP chief-of-staff workflow
-- Azure Key Vault
-- Azure Blob Storage for artifacts
-- Log Analytics and Application Insights for observability
-- an Arbiter layer for command authorization and log redaction
-- Pulumi Python with Azure Native
-
-V1 intentionally does not include AWS, Bedrock, Ollama, Kubernetes, or webhook complexity.
-
-## Commands
-
-- `/ping` -> bot-only liveness check with `pong`, `latency_ms`, `bot_pid`, `app_version`
-- `/help` -> command list
-- `/status` -> Azure runtime status, model, region, version, uptime, and degraded dependency checks
-- `/brief <topic>` -> retrieve memory and prepare an operational brief
-- `/followup <person/company/topic>` -> retrieve context, draft a follow-up, store a pending action package
-- `/prep <meeting/person/company>` -> retrieve context and prepare a meeting/person/company brief
-- `/remember <fact/decision>` -> save memory
-- `/find <topic/person/project>` -> search memory
-- `/draft <email/post/doc>` -> store a draft action package requiring approval before external use
-- `/task <task>` -> capture a task action package
-
-Nexus stores full JSON action packages in SQLite. Telegram output stays concise unless `NEXUS_DEBUG_JSON=true`.
-
-## Chief-Of-Staff Workflow
-
-The operational command path is:
-
-1. Receive Telegram message
-2. Classify command intent
-3. Retrieve relevant memory for context-heavy commands
-4. Route to the correct MVP agent
-5. Generate an action package
-6. Store the package
-7. Ask Nolan for approval when external execution would be required
-
-External execution is intentionally not implemented in this milestone. Nexus may draft, summarize, remember, prepare, and recommend. It must not send email, deploy infrastructure, delete data, spend money, or message external people without approval.
-
-MVP agents:
-
-- `ChiefOfStaffAgent`
-- `PartnershipAgent`
-- `GrantAgent`
-- `SprintAgent`
-- `InfrastructureAgent`
-- `MemoryAgent`
-- `WritingAgent`
-
-SQLite memory currently supports:
-
-- people
-- organizations
-- projects
-- decisions
-- tasks
-- deadlines
-- drafts
-- action packages
-
-## Health Endpoint
-
-- `GET /healthz` returns `200`
-
-## Repo Layout
+## Architecture
 
 ```text
-aari-nexus-azure/
-├── app/
-│   ├── arbiter.py
-│   ├── document_flow.py
-│   ├── intake.py
-│   ├── main.py
-│   ├── bot.py
-│   ├── commands.py
-│   ├── azure_openai_client.py
-│   ├── config.py
-│   └── telemetry.py
-├── infra/
-│   ├── Pulumi.yaml
-│   ├── Pulumi.dev.yaml
-│   ├── __main__.py
-│   └── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── .env.example
-├── README.md
-├── docs/
-│   ├── architecture.md
-│   ├── deployment.md
-│   └── runbook.md
-└── tests/
-    ├── test_arbiter.py
-    └── test_commands.py
+Gmail / Forms / Excel / CSV / PDFs / APIs
+                    |
+          validate / normalize / deduplicate
+             |                    |
+        PostgreSQL 16            MinIO
+             +---------+----------+
+                       |
+                    FastAPI
+                  /         \
+          read-only MCP    dashboards
 ```
 
-## AWS Reference Findings
+PostgreSQL includes pgvector, but embeddings are disabled until an approved provider is
+configured. Redis is also disabled unless the `cache` Compose profile is selected.
 
-The AWS repo at `/Users/atlanta_ai_robotics/Projects/aari/aari-nexus` was used only as a behavioral reference.
+## Quick start
 
-What carried over:
-
-- one small HTTP service process
-- env-driven model selection
-- simple command routing
-
-What was removed:
-
-- AWS deployment assumptions
-- Bedrock integrations
-- Ollama runtime
-- local model routing
-
-## Local Setup
-
-1. Copy env file:
+Requirements: Docker with Compose v2 (or Podman Compose) and GNU Make.
 
 ```bash
 cp .env.example .env
+# Replace every local development password before a shared deployment.
+docker compose up -d --build
+curl http://localhost:8000/health
+curl http://localhost:8000/ready
 ```
 
-2. Fill in:
-
-- `TELEGRAM_BOT_TOKEN`
-- `AZURE_OPENAI_ENDPOINT`
-- `AZURE_OPENAI_API_KEY`
-- `AZURE_OPENAI_DEPLOYMENT`
-- `AZURE_OPENAI_API_VERSION`
-- `PEP_BASE_URL`
-- `NEXUS_MEMORY_PATH`
-- `NEXUS_DEBUG_JSON`
-- optional production-only values:
-  - `AZURE_KEY_VAULT_URI`
-  - `AZURE_CLIENT_ID`
-
-PEP URL rules:
-
-- local single-process testing uses `http://localhost:8081`
-- Docker Compose uses `http://pep:8081`
-- Azure Container Apps uses the internal service URL for the PEP app
-- never use `0.0.0.0` as a client URL
-
-3. Install dependencies:
+The API startup runs `alembic upgrade head`; it never drops or recreates existing data. Local
+development ports bind only to `127.0.0.1`.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -r requirements.txt
+make setup
+make up
+make seed
+make test
+make down
 ```
 
-4. Run tests:
+Enable Redis only when an approved cache use exists:
 
 ```bash
-python3 -m unittest discover -s tests
+docker compose --profile cache up -d redis
 ```
 
-5. Run locally:
+## Import existing data
+
+Import a supported file or directory recursively:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+make import FILE="$HOME/Downloads/aari-evidence"
+.venv/bin/python scripts/import_directory.py report.pdf --classification internal
 ```
 
-6. Check health:
+Supported base formats are CSV, XLSX, JSON, and PDF. The reusable pipeline validates size and
+MIME type, calculates SHA-256, stores the original in MinIO, parses and normalizes supported
+content, writes lineage and audit events, and rejects checksum duplicates.
+
+The existing assessment command remains supported; its parser is now reusable by the database
+assessment importer:
 
 ```bash
-curl http://localhost:8000/healthz
+python scripts/ingest_assessment.py \
+  --input "$HOME/Downloads/Technical Skills Assessment Survey (Responses).xlsx" \
+  --cohort summer-2026-data-center \
+  --stage baseline \
+  --instrument-version 2026-01
 ```
 
-7. Expected `/ping` behavior:
+Never put raw student data under `data/samples` or commit it. `data/incoming`, `data/processed`,
+and `data/rejected` are ignored except for placeholder files.
 
-- returns immediately without calling PEP, Azure OpenAI, Blob Storage, Key Vault, or Application Insights
-- includes `latency_ms`, `bot_pid`, and `app_version`
-
-## Local Docker Test
+Ingest the standardized downloaded Week 2 student reports into the private Azure compatibility
+store, preserving conflicting source provenance without double-counting it:
 
 ```bash
-docker compose up --build
-curl http://localhost:8000/healthz
+AZURE_STORAGE_ACCOUNT_URL=https://<account>.blob.core.windows.net \
+  python scripts/ingest_student_reports.py --downloads "$HOME/Downloads" --upload
+
+AZURE_STORAGE_ACCOUNT_URL=https://<account>.blob.core.windows.net \
+  python scripts/regenerate_student_report_analytics.py \
+  --downloads "$HOME/Downloads" --upload
 ```
 
-## Azure Deployment Flow
+Both commands default to the private `artifacts` container, use `DefaultAzureCredential`, classify
+student data as internal, and set `index_allowed=false`.
 
-Prereqs:
+## API
 
-- Azure subscription
-- Azure OpenAI access and deployment name
-- Telegram bot token
-- Pulumi account or local backend
-- Azure CLI login
+Interactive OpenAPI documentation is available at `http://localhost:8000/docs`. Versioned routes
+are under `/api/v1` and include documents, ingestion jobs, students, progress, cohorts, metrics,
+grants, financial summary, and bounded search. Responses include `X-Request-ID`.
 
-1. Login:
+Azure submission:
 
 ```bash
-az login
-az account set --subscription "<YOUR_SUBSCRIPTION_ID>"
-pulumi login
+python scripts/submit_from_azure.py staged-report.pdf \
+  --source-identifier "azure-workflow/run-123"
 ```
 
-2. Build and push the container image to ACR after `pulumi preview` creates the registry name or by choosing a fixed tag:
+See [Azure integration](docs/azure-workflow-integration.md).
+
+## Codex MCP
+
+The MCP process uses `READONLY_DATABASE_URL`. That role receives SELECT privileges and permission
+to execute one security-definer audit function; it cannot insert, update, delete, create, or run
+arbitrary SQL through an MCP tool.
 
 ```bash
-cd infra
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -r requirements.txt
-pulumi stack init dev
-pulumi config set azure-native:location eastus
-pulumi config set environment dev
-pulumi config set regionAbbr eus
-pulumi config set --secret telegramBotToken "<TOKEN>"
-pulumi config set --secret azureOpenAiEndpoint "<ENDPOINT>"
-pulumi config set --secret azureOpenAiApiKey "<API_KEY>"
-pulumi config set --secret azureOpenAiDeployment "<DEPLOYMENT>"
-pulumi config set --secret azureOpenAiApiVersion "2024-10-21"
-pulumi preview
+READONLY_DATABASE_URL='postgresql+psycopg://...' \
+  .venv/bin/python -m mcp_server.server
 ```
 
-3. Build and push the app image to ACR using the exported login server:
+Codex configuration example:
+
+```toml
+[mcp_servers.aari]
+command = "/absolute/path/to/.venv/bin/python"
+args = ["-m", "mcp_server.server"]
+cwd = "/absolute/path/to/aari-nexus-azure"
+
+[mcp_servers.aari.env]
+READONLY_DATABASE_URL = "postgresql+psycopg://aari_readonly:REDACTED@localhost:5432/aari"
+```
+
+## Operations
 
 ```bash
-az acr login --name <ACR_NAME>
-docker build -t <ACR_LOGIN_SERVER>/aari-nexus-azure:dev ..
-docker push <ACR_LOGIN_SERVER>/aari-nexus-azure:dev
+make migrate
+make migration MESSAGE="describe change"
+make lint
+make test
+make backup
+make restore FILE=backups/20260731T120000Z
+python scripts/verify_environment.py
 ```
 
-4. Deploy:
+Relevant documentation:
 
-```bash
-pulumi up
-```
-
-5. Validate:
-
-- browse `<container-app-url>/healthz`
-- send `/ping` in Telegram
-- send `/status`
-- send `/help`
-- send `/remember Cisco is interested in AARI edge AI workforce programming`
-- send `/find Cisco edge AI`
-- send `/brief Cisco partnership context`
-- send `/prep QTS data center workforce meeting`
-- send `/followup Microsoft partnership`
-
-## Notes
-
-- polling is used instead of webhook for v1 simplicity
-- Key Vault is the production secret source for the Container App
-- the app resolves production secrets from Key Vault at startup by using `DefaultAzureCredential` with the user-assigned managed identity
-- the Container App uses managed identity for ACR pull, Key Vault secret reads, and Blob artifact writes
-- PEP health checks use `PEP_BASE_URL` with a 1-second timeout and degrade `/status` instead of blocking the bot
-- `/ping` is isolated from downstream dependencies and serves as a bot-only liveness check
-- action packages are stored in SQLite locally for the MVP
-- Telegram replies render human-readable summaries, not raw JSON, unless `NEXUS_DEBUG_JSON=true`
-- artifact uploads store sanitized metadata, not raw prompts or responses
-
-More detail:
-
-- [docs/architecture.md](docs/architecture.md)
-- [docs/deployment.md](docs/deployment.md)
-- [docs/runbook.md](docs/runbook.md)
+- [Current-state assessment](docs/current-state-assessment.md)
+- [Platform architecture](docs/architecture.md)
+- [Security model](docs/security-model.md)
+- [Data governance](docs/data-governance.md)
+- [Backup and recovery](docs/backup-and-recovery.md)
+- [Azure workflow integration](docs/azure-workflow-integration.md)
