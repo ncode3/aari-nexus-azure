@@ -9,12 +9,15 @@ student database, scheduled synchronization, or model-generated enrollment count
 
 | Command | Result |
 | --- | --- |
+| `/start` or `/help` | Show the command menu. No model call. |
+| `/today` | Shortcut for `/cohort followups`, with the same explicit chat access check. |
+| `/metrics` | Shortcut for `/cohort impact`, with the same explicit chat access check. |
 | `/cohort desk` | Open the published staff app, follow-up queue, and cohort summary. No Graph request. |
 | `/cohort` or `/cohort summary` | Registration and readiness totals, stage counts, and cohort/track groups. |
 | `/cohort impact` | Current pipeline readiness, overlapping blocker counts, and explicitly unmeasured business outcomes. |
 | `/cohort followups` | New registrations with pending readiness: overdue, due today, undated, and unassigned counts. |
 
-Every command requires an explicitly allowed Telegram chat. An empty
+Every Cohort Desk command requires an explicitly allowed Telegram chat. An empty
 `BOT_ALLOWED_CHAT_IDS` does not authorize Cohort Desk commands. Existing commands
 retain their existing behavior.
 

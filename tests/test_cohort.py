@@ -242,16 +242,20 @@ class CohortCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("more groups", result)
 
     async def test_allowlist_and_routing(self):
+        for command, mode in [("/cohort summary", "summary"), ("/today", "followups"), ("/metrics", "impact")]:
+            await self.check_allowlist_and_routing(command, mode)
+
+    async def check_allowlist_and_routing(self, command, mode):
         for allowed, chat_id, accepted in [(set(), 42, False), ({42}, 43, False), ({42}, 42, True)]:
-            with self.subTest(allowed=allowed, chat_id=chat_id), TemporaryDirectory() as tmp:
+            with self.subTest(command=command, allowed=allowed, chat_id=chat_id), TemporaryDirectory() as tmp:
                 settings = replace(BASE, bot_allowed_chat_ids=allowed, nexus_memory_path=tmp + "/memory.db")
                 runner = TelegramBotRunner(settings, None, None, datetime.now(UTC))
                 runner._send_message = AsyncMock()
                 with patch("app.bot.handle_cohort", new=AsyncMock(return_value="cohort result")) as handler:
-                    await runner._handle_update(None, {"message": {"chat": {"id": chat_id}, "text": "/cohort summary"}})
+                    await runner._handle_update(None, {"message": {"chat": {"id": chat_id}, "text": command}})
                     self.assertEqual(handler.await_count, int(accepted))
                     if accepted:
-                        handler.assert_awaited_once_with("summary", settings)
+                        handler.assert_awaited_once_with(mode, settings)
                         runner._send_message.assert_awaited_once_with(None, chat_id, "cohort result")
 
 

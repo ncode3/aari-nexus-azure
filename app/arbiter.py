@@ -86,6 +86,13 @@ class NexusArbiter:
 
     def authorize_command(self, command: str, remainder: str) -> CommandDecision:
         normalized = command.strip().lower()
+        aliases = {
+            "/start": ("/help", ""),
+            "/today": ("/cohort", "followups"),
+            "/metrics": ("/cohort", "impact"),
+        }
+        if normalized in aliases:
+            normalized, remainder = aliases[normalized]
         if normalized not in ALLOWED_COMMANDS:
             raise ValueError("Unknown command. Use /help.")
         return CommandDecision(command=normalized, prompt=self.sanitize_prompt(remainder))
