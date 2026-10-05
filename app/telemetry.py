@@ -22,6 +22,8 @@ def configure_logging(settings: Settings) -> None:
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    # Exporter transport INFO logs must not feed back into the log exporter.
+    logging.getLogger("azure").setLevel(logging.WARNING)
     if settings.app_insights_connection_string:
         from azure.monitor.opentelemetry import configure_azure_monitor
 
