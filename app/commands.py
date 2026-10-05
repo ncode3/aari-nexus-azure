@@ -20,7 +20,7 @@ def build_help_text() -> str:
     return "\n".join(
         [
             "Available commands:",
-            "/cohort [summary|followups|desk] - live registration counts and staff workspace",
+            "/cohort [summary|followups|impact|desk] - live registration counts and staff workspace",
             "/ping - connectivity test",
             "/status - runtime and Azure service status",
             "/help - show this message",

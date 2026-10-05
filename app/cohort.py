@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import time
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from urllib.parse import quote, urlparse
 from zoneinfo import ZoneInfo
 
@@ -12,6 +14,7 @@ import httpx
 from azure.identity.aio import DefaultAzureCredential
 
 from app.config import Settings
+from app.telemetry import log_event
 
 GRAPH_ROOT = "https://graph.microsoft.com/v1.0"
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
@@ -55,6 +58,12 @@ class CohortSummary:
     due_today: int
     undated: int
     unassigned: int
+    pipeline: int
+    pipeline_ready: int
+    missing_registration: int
+    missing_schedule: int
+    missing_transport: int
+    missing_consent: int
     groups: tuple[tuple[str, str, int, int], ...]
 
 
@@ -66,12 +75,15 @@ def summarize(items: list[dict], today: date) -> CohortSummary:
             raise CohortUnavailable("The registration list schema is incomplete. Check the Cohort Desk field mapping.")
         if _flag(fields["IsTest"]):
             continue
+        if fields["Stage"] not in {"New", "Active", "Completed", "Withdrawn"}:
+            raise CohortUnavailable("The registration list contains an invalid stage.")
         flags = [_flag(fields[name]) for name in ("RegistrationComplete", "ScheduleConfirmed", "TransportConfirmed")]
         ready = all(flags) and fields["GuardianConsent"] in {"Received", "Not required"}
         rows.append((fields, ready))
 
     stages = Counter(row["Stage"] for row, _ in rows)
     pending = [row for row, ready in rows if row["Stage"] == "New" and not ready]
+    pipeline = [(row, ready) for row, ready in rows if row["Stage"] in {"New", "Active"}]
     overdue = due_today = undated = unassigned = 0
     for row in pending:
         value = row.get("NextFollowUp")
@@ -97,6 +109,11 @@ def summarize(items: list[dict], today: date) -> CohortSummary:
         active=stages["Active"], completed=stages["Completed"], withdrawn=stages["Withdrawn"],
         followups=len(pending), overdue=overdue, due_today=due_today,
         undated=undated, unassigned=unassigned,
+        pipeline=len(pipeline), pipeline_ready=sum(ready for _, ready in pipeline),
+        missing_registration=sum(not _flag(row["RegistrationComplete"]) for row, _ in pipeline),
+        missing_schedule=sum(not _flag(row["ScheduleConfirmed"]) for row, _ in pipeline),
+        missing_transport=sum(not _flag(row["TransportConfirmed"]) for row, _ in pipeline),
+        missing_consent=sum(row["GuardianConsent"] not in {"Received", "Not required"} for row, _ in pipeline),
         groups=tuple((cohort, track, *counts) for (cohort, track), counts in sorted(groups.items())),
     )
 
@@ -199,16 +216,44 @@ def desk_links(settings: Settings) -> str:
 
 async def handle_cohort(payload: str, settings: Settings, client: CohortClient | None = None) -> str:
     mode = payload.strip().lower()
-    if mode not in {"", "summary", "followups", "desk"}:
-        return "Usage: /cohort [summary|followups|desk]"
+    if mode not in {"", "summary", "followups", "impact", "desk"}:
+        return "Usage: /cohort [summary|followups|impact|desk]"
     if mode == "desk":
         return desk_links(settings)
+    source_key = hashlib.sha256("|".join((settings.app_env, settings.cohort_site_url.rstrip("/"),
+                                        settings.cohort_list_id)).encode()).hexdigest()[:16]
+    started = time.perf_counter()
     try:
         result = await (client or CohortClient(settings)).summary()
     except CohortUnavailable as exc:
+        log_event("cohort.measurement", schema_version=1, source_key=source_key,
+                  status="unavailable", read_seconds=round(time.perf_counter() - started, 3))
         return f"Cohort Desk reporting unavailable: {exc}\nNo counts reported.\n\n{desk_links(settings)}"
-    lines = ["AARI Cohort Desk", "Source: live SharePoint registrations; test records excluded."]
-    if mode != "followups":
+    observed_at = datetime.now(UTC).isoformat()
+    # Explicit numeric allowlist: never serialize groups, raw rows, names or notes.
+    measurements = {name: getattr(result, name) for name in (
+        "registrations", "ready", "active", "completed", "withdrawn", "followups",
+        "overdue", "due_today", "undated", "unassigned", "pipeline", "pipeline_ready",
+        "missing_registration", "missing_schedule", "missing_transport", "missing_consent",
+    )}
+    log_event("cohort.measurement", schema_version=1, source_key=source_key,
+              status="available", observed_at=observed_at,
+              read_seconds=round(time.perf_counter() - started, 3), **measurements)
+    lines = ["AARI Cohort Desk", "Source: live SharePoint registrations; test records excluded.",
+             f"Observed: {observed_at}"]
+    if mode == "impact":
+        readiness = (f"{100 * result.pipeline_ready / result.pipeline:.1f}%"
+                     if result.pipeline else "Not measurable: no New/Active records")
+        lines += [f"Current pipeline (New + Active): {result.pipeline}",
+                  f"Ready in pipeline: {result.pipeline_ready} | Readiness rate: {readiness}",
+                  f"Missing registration: {result.missing_registration}",
+                  f"Missing schedule: {result.missing_schedule} | Missing transport: {result.missing_transport}",
+                  f"Missing consent: {result.missing_consent}",
+                  "Blocker counts overlap; one registration can have several blockers.",
+                  "Staff time saved: not measured. Added revenue: not measured.",
+                  "Attendance/placements: not measured. Net financial benefit: not measured.",
+                  "This snapshot alone does not establish improvement or causation."]
+    elif mode != "followups":
         lines += [f"Registrations: {result.registrations} | Ready: {result.ready}",
                   f"Active: {result.active} | Completed: {result.completed} | Withdrawn: {result.withdrawn}",
                   "Counts are registration records, not verified attendance or placements."]

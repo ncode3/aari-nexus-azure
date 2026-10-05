@@ -1,0 +1,53 @@
+// Run against the existing Log Analytics workspace. This does not create resources.
+// Application Insights resource scope: replace AppTraces with traces,
+// TimeGenerated with timestamp, and Message with message.
+// Select ONE final result expression below together with the let definitions.
+let Events = materialize(
+    AppTraces
+    | where TimeGenerated > ago(30d)
+    | extend m = parse_json(Message)
+    | where tostring(m.event) == "cohort.measurement" and toint(m.schema_version) == 1
+    | project observed_at = todatetime(m.time), source_key = tostring(m.source_key),
+              status = tostring(m.status), registrations = toint(m.registrations),
+              pipeline = toint(m.pipeline), pipeline_ready = toint(m.pipeline_ready),
+              overdue = toint(m.overdue), undated = toint(m.undated),
+              unassigned = toint(m.unassigned), completed = toint(m.completed),
+              withdrawn = toint(m.withdrawn), read_seconds = todouble(m.read_seconds)
+    | extend readiness_pct = iff(pipeline > 0, 100.0 * pipeline_ready / pipeline, real(null))
+);
+let Valid = Events | where status == "available";
+let First = Valid | summarize arg_min(observed_at, *) by source_key
+    | project source_key, baseline_at = observed_at, baseline_pipeline = pipeline,
+              baseline_ready = pipeline_ready, baseline_readiness_pct = readiness_pct,
+              baseline_overdue = overdue;
+let Last = Valid | summarize arg_max(observed_at, *) by source_key
+    | project source_key, latest_valid_at = observed_at, current_pipeline = pipeline,
+              current_ready = pipeline_ready, current_readiness_pct = readiness_pct,
+              current_overdue = overdue, undated, unassigned, completed, withdrawn;
+let LatestStatus = Events | summarize arg_max(observed_at, status) by source_key
+    | project source_key, latest_attempt_at = observed_at, latest_status = status;
+First
+| join kind=inner Last on source_key
+| join kind=inner LatestStatus on source_key
+| extend comparison_available = latest_valid_at > baseline_at,
+         readiness_change_pp = iff(latest_valid_at > baseline_at,
+             current_readiness_pct - baseline_readiness_pct, real(null)),
+         overdue_change = iff(latest_valid_at > baseline_at,
+             current_overdue - baseline_overdue, int(null))
+| project source_key, baseline_at, latest_valid_at, latest_attempt_at, latest_status,
+          comparison_available, baseline_pipeline, current_pipeline,
+          baseline_ready, current_ready, baseline_readiness_pct, current_readiness_pct,
+          readiness_change_pp, baseline_overdue, current_overdue, overdue_change,
+          undated, unassigned, completed, withdrawn
+
+// Daily latest observation, preserving unavailable states. Do not SUM snapshots.
+// Events
+// | extend local_day = startofday(datetime_utc_to_local(observed_at, "America/New_York"))
+// | summarize arg_max(observed_at, *) by source_key, local_day
+// | order by local_day asc
+
+// Read performance is technical latency, NOT staff time saved or business uptime.
+// Events
+// | summarize attempts = count(), unavailable_reads = countif(status == "unavailable"),
+//             p50_read_seconds = percentile(read_seconds, 50),
+//             p95_read_seconds = percentile(read_seconds, 95) by source_key

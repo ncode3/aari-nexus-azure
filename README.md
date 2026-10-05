@@ -271,7 +271,7 @@ More detail:
 ## Cohort Desk
 
 The published staff workspace connects to the operations bot through
-`/cohort [summary|followups|desk]`. Nexus reports registration readiness and
+`/cohort [summary|followups|impact|desk]`. Nexus reports registration readiness and
 follow-up counts directly from SharePoint and links back to the staff app.
 Test records are excluded. Live reporting requires deployment and selected
 SharePoint read access for the existing identity; it is disabled by default.
