@@ -4,6 +4,13 @@ Cohort Desk is the staff entry and editing interface. SharePoint remains the
 source of truth. Nexus reads current records on request and returns deterministic
 counts, with links to the staff app and SharePoint views. There is no second
 student database, scheduled synchronization, or model-generated enrollment count.
+External application forms are not synchronized. A zero SharePoint count is not
+evidence of zero submissions in Smartsheet, Jotform, or another intake system.
+
+The deployment includes `aiohttp`, required by Azure Identity's async credentials.
+CI checks that the Azure async transport can be constructed after dependency
+installation. Azure SDK transport INFO logs are suppressed so telemetry exports
+do not create recurring export log noise; application events remain enabled.
 
 ## Commands
 

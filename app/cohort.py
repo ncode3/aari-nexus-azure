@@ -240,6 +240,7 @@ async def handle_cohort(payload: str, settings: Settings, client: CohortClient |
               status="available", observed_at=observed_at,
               read_seconds=round(time.perf_counter() - started, 3), **measurements)
     lines = ["AARI Cohort Desk", "Source: live SharePoint registrations; test records excluded.",
+             "External application forms are not synchronized into this report.",
              f"Observed: {observed_at}"]
     if mode == "impact":
         readiness = (f"{100 * result.pipeline_ready / result.pipeline:.1f}%"
