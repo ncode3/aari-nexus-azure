@@ -11,6 +11,7 @@ student database, scheduled synchronization, or model-generated enrollment count
 | --- | --- |
 | `/cohort desk` | Open the published staff app, follow-up queue, and cohort summary. No Graph request. |
 | `/cohort` or `/cohort summary` | Registration and readiness totals, stage counts, and cohort/track groups. |
+| `/cohort impact` | Current pipeline readiness, overlapping blocker counts, and explicitly unmeasured business outcomes. |
 | `/cohort followups` | New registrations with pending readiness: overdue, due today, undated, and unassigned counts. |
 
 Every command requires an explicitly allowed Telegram chat. An empty
@@ -39,8 +40,10 @@ variables or Pulumi configuration.
   never presented as complete. The default cap is 100 pages of 200 items.
 
 Only reporting fields are requested. Participant names, contact details, free-text
-notes, files and consent documents are not requested. Data is not sent to Azure
-OpenAI, placed in memory, written to Blob storage, or logged by this integration.
+notes, files and consent documents are not requested. Record data is not sent to Azure
+OpenAI, placed in memory, or written to Blob storage. Numeric aggregate snapshots
+are logged to the existing telemetry pipeline; free-text group labels and
+participant details are excluded. See [business measurement](business-measurement.md).
 No public HTTP endpoint is added. The Graph client only issues GET requests and
 will not forward its bearer token to a pagination URL outside Microsoft Graph.
 

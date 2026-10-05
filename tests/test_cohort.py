@@ -160,7 +160,7 @@ class CohortCommandTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_invalid_command_makes_no_request(self):
         client = SimpleNamespace(summary=AsyncMock())
-        self.assertEqual(await handle_cohort("delete", BASE, client), "Usage: /cohort [summary|followups|desk]")
+        self.assertEqual(await handle_cohort("delete", BASE, client), "Usage: /cohort [summary|followups|impact|desk]")
         client.summary.assert_not_awaited()
 
     async def test_report_excludes_names_and_notes(self):
@@ -175,6 +175,64 @@ class CohortCommandTests(unittest.IsolatedAsyncioTestCase):
         result = await handle_cohort("followups", BASE, SimpleNamespace(summary=AsyncMock(return_value=summary)))
         self.assertIn("No date: 1 | No owner: 1", result)
         self.assertNotIn("Cohort / track", result)
+
+    async def test_impact_denominator_excludes_closed_and_test_records(self):
+        ready = dict(RegistrationComplete=True, ScheduleConfirmed=True,
+                     TransportConfirmed=True, GuardianConsent="Received")
+        rows = [item("1", **ready), item("2", Stage="Active"),
+                item("3", Stage="Completed", **ready),
+                item("4", Stage="Withdrawn", **ready), item("5", IsTest=True, **ready)]
+        result = await handle_cohort("impact", BASE, SimpleNamespace(
+            summary=AsyncMock(return_value=summarize(rows, date.today()))))
+        self.assertIn("Current pipeline (New + Active): 2", result)
+        self.assertIn("Readiness rate: 50.0%", result)
+        self.assertIn("Missing registration: 1", result)
+        self.assertIn("Missing schedule: 1 | Missing transport: 1", result)
+        self.assertIn("Missing consent: 1", result)
+        self.assertIn("Staff time saved: not measured", result)
+        self.assertIn("Blocker counts overlap", result)
+
+    async def test_empty_impact_has_no_misleading_rate(self):
+        result = await handle_cohort("impact", BASE, SimpleNamespace(
+            summary=AsyncMock(return_value=summarize([], date.today()))))
+        self.assertIn("Not measurable: no New/Active records", result)
+        self.assertNotIn("0.0%", result)
+
+    async def test_measurement_event_has_numeric_counts_and_no_free_text(self):
+        summary = summarize([item(Title="Private Student", Cohort="Private Group",
+                                  Track="Private Track", FollowUpNotes="Private notes")], date.today())
+        with patch("app.cohort.log_event") as log:
+            await handle_cohort("impact", BASE, SimpleNamespace(summary=AsyncMock(return_value=summary)))
+        event, = log.call_args.args
+        fields = log.call_args.kwargs
+        self.assertEqual(event, "cohort.measurement")
+        self.assertEqual(fields["registrations"], 1)
+        self.assertEqual(fields["status"], "available")
+        self.assertIsNotNone(datetime.fromisoformat(fields["observed_at"]).tzinfo)
+        self.assertNotIn("Private", str(fields))
+        self.assertNotIn("groups", fields)
+        self.assertNotIn(BASE.cohort_site_url, str(fields))
+
+    async def test_unavailable_event_never_logs_counts_or_exception_details(self):
+        client = SimpleNamespace(summary=AsyncMock(side_effect=CohortUnavailable("Safe reason")))
+        with patch("app.cohort.log_event") as log:
+            await handle_cohort("impact", BASE, client)
+        self.assertEqual(log.call_args.kwargs["status"], "unavailable")
+        self.assertNotIn("registrations", log.call_args.kwargs)
+        self.assertNotIn("Safe reason", str(log.call_args))
+
+    async def test_different_sources_do_not_share_measurement_scope(self):
+        client = SimpleNamespace(summary=AsyncMock(return_value=summarize([], date.today())))
+        keys = []
+        for settings in (BASE, replace(BASE, cohort_list_id="another-list"), replace(BASE, app_env="prod")):
+            with patch("app.cohort.log_event") as log:
+                await handle_cohort("impact", settings, client)
+            keys.append(log.call_args.kwargs["source_key"])
+        self.assertEqual(len(set(keys)), 3)
+
+    async def test_unknown_stage_cannot_silently_change_denominator(self):
+        with self.assertRaisesRegex(CohortUnavailable, "invalid stage"):
+            summarize([item(Stage="unknown")], date.today())
 
     async def test_large_summary_fits_telegram_limit(self):
         rows = [item(str(i), Cohort=str(i) * 100, Track="R" * 100) for i in range(100)]
