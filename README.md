@@ -267,3 +267,12 @@ More detail:
 - [docs/architecture.md](docs/architecture.md)
 - [docs/deployment.md](docs/deployment.md)
 - [docs/runbook.md](docs/runbook.md)
+
+## Cohort Desk
+
+The published staff workspace connects to the operations bot through
+`/cohort [summary|followups|desk]`. Nexus reports registration readiness and
+follow-up counts directly from SharePoint and links back to the staff app.
+Test records are excluded. Live reporting requires deployment and selected
+SharePoint read access for the existing identity; it is disabled by default.
+See [Cohort Desk integration](docs/cohort-desk.md) for activation and verification.

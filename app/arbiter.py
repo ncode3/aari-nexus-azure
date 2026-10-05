@@ -7,6 +7,7 @@ from typing import Literal
 
 
 ALLOWED_COMMANDS = {
+    "/cohort",
     "/ping",
     "/status",
     "/help",

@@ -68,3 +68,9 @@ PEP client configuration:
 - the Container App uses managed identity for ACR, Key Vault, and Blob access
 - production secrets are stored in Key Vault and loaded by the app at startup through the user-assigned managed identity
 - `/brief` artifact uploads contain sanitized metadata only
+
+## Cohort Desk activation
+
+[Cohort Desk integration](cohort-desk.md) documents the existing staff app,
+read-only Graph access, authorized chat configuration, and validation. Merging
+code or receiving a successful health check is not proof of a live connection.

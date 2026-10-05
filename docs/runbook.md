@@ -63,3 +63,16 @@ Check:
 ## Container App Logs
 
 Use Azure Container Apps log streaming or Azure Monitor logs after deployment.
+
+### `/cohort` reports unavailable
+
+Check `COHORT_GRAPH_ENABLED`, the existing identity's selected SharePoint read
+permission, site/list configuration, and connectivity to Microsoft Graph. Do
+not interpret unavailable as zero registrations. `/cohort desk` provides direct
+workspace links without reading records. See [cohort-desk.md](cohort-desk.md).
+
+### `/cohort` says the chat is unauthorized
+
+Cohort commands require an explicit `BOT_ALLOWED_CHAT_IDS` entry, even when other
+legacy commands allow an empty list. Retain the existing approved chats; do not
+open access to resolve this error.

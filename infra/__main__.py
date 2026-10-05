@@ -27,6 +27,28 @@ app_version = config.get("appVersion") or "0.3.0"
 image_tag = config.get("containerImageTag") or app_version
 image_name = f"aari-nexus-azure:{image_tag}"
 
+cohort_graph_enabled = config.get_bool("cohortGraphEnabled") or False
+bot_allowed_chat_ids = config.get("botAllowedChatIds") or ""
+if cohort_graph_enabled and not bot_allowed_chat_ids.strip():
+    raise ValueError("Set botAllowedChatIds before enabling Cohort Desk reporting.")
+cohort_env = [
+    app.EnvironmentVarArgs(name="COHORT_GRAPH_ENABLED", value=str(cohort_graph_enabled).lower()),
+]
+# Only add the allowlist when provided; do not introduce a new permissive default.
+if bot_allowed_chat_ids.strip():
+    cohort_env.append(app.EnvironmentVarArgs(name="BOT_ALLOWED_CHAT_IDS", value=bot_allowed_chat_ids))
+for config_name, env_name_key in {
+    "cohortSiteId": "COHORT_SITE_ID",
+    "cohortSiteUrl": "COHORT_SITE_URL",
+    "cohortListId": "COHORT_LIST_ID",
+    "cohortAppUrl": "COHORT_APP_URL",
+    "cohortQueueUrl": "COHORT_QUEUE_URL",
+    "cohortSummaryUrl": "COHORT_SUMMARY_URL",
+}.items():
+    value = config.get(config_name)
+    if value:
+        cohort_env.append(app.EnvironmentVarArgs(name=env_name_key, value=value))
+
 owner = config.get("owner") or "aari"
 cost_center = config.get("costCenter") or "r-and-d"
 data_classification = config.get("dataClassification") or "internal"
@@ -316,7 +338,7 @@ container_app = app.ContainerApp(
             app.ContainerArgs(
                 name="nexus",
                 image=image_ref,
-                env=[
+                env=cohort_env + [
                     app.EnvironmentVarArgs(name="AZURE_STORAGE_ACCOUNT_URL", value=storage_account_url),
                     app.EnvironmentVarArgs(name="AZURE_STORAGE_CONTAINER", value="artifacts"),
                     app.EnvironmentVarArgs(name="APPLICATIONINSIGHTS_CONNECTION_STRING", value=app_insights.connection_string),

@@ -55,6 +55,15 @@ class Settings:
     model_timeout_seconds: float
     nexus_memory_path: str
     nexus_debug_json: bool
+    azure_client_id: str | None = None
+    cohort_graph_enabled: bool = False
+    cohort_site_id: str = ""
+    cohort_site_url: str = "https://aari.sharepoint.com/sites/AARICohortDesk"
+    cohort_list_id: str = "c2b94b21-d99a-4608-8939-5fed06a86cde"
+    cohort_app_url: str = "https://apps.powerapps.com/play/e/default-b13dd871-64d2-4218-abc5-b6f813344921/a/faf9263b-6527-4763-a10d-db68e207e4fa?tenantId=b13dd871-64d2-4218-abc5-b6f813344921"
+    cohort_queue_url: str = "https://aari.sharepoint.com/sites/AARICohortDesk/Lists/Cohort%20Registrations/Followup%20Queue.aspx"
+    cohort_summary_url: str = "https://aari.sharepoint.com/sites/AARICohortDesk/Lists/Cohort%20Registrations/Cohort%20Summary.aspx"
+    cohort_max_pages: int = 100
 
 
 def _get_secret_client(vault_uri: str) -> SecretClient:
@@ -108,6 +117,15 @@ def get_settings() -> Settings:
         pep_health_timeout_seconds=max(0.1, float(os.getenv("PEP_HEALTH_TIMEOUT_SECONDS", "1"))),
         model_timeout_seconds=max(1.0, float(os.getenv("MODEL_TIMEOUT_SECONDS", "20"))),
         nexus_memory_path=os.getenv("NEXUS_MEMORY_PATH", str(BASE_DIR / "data" / "nexus_memory.sqlite3")).strip(),
+        azure_client_id=os.getenv("AZURE_CLIENT_ID", "").strip() or None,
+        cohort_graph_enabled=os.getenv("COHORT_GRAPH_ENABLED", "false").lower() in {"true", "1", "yes"},
+        cohort_site_id=os.getenv("COHORT_SITE_ID", "").strip(),
+        cohort_site_url=os.getenv("COHORT_SITE_URL", Settings.cohort_site_url).strip(),
+        cohort_list_id=os.getenv("COHORT_LIST_ID", Settings.cohort_list_id).strip(),
+        cohort_app_url=os.getenv("COHORT_APP_URL", Settings.cohort_app_url).strip(),
+        cohort_queue_url=os.getenv("COHORT_QUEUE_URL", Settings.cohort_queue_url).strip(),
+        cohort_summary_url=os.getenv("COHORT_SUMMARY_URL", Settings.cohort_summary_url).strip(),
+        cohort_max_pages=max(1, int(os.getenv("COHORT_MAX_PAGES", "100"))),
         nexus_debug_json=os.getenv("NEXUS_DEBUG_JSON", "").strip().lower() in {"1", "true", "yes"},
     )
 
