@@ -21,6 +21,17 @@ class ArbiterTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.arbiter.authorize_command("/unknown", "")
 
+    def test_operator_shortcuts_use_existing_routes(self) -> None:
+        for command, route, prompt in [
+            ("/start", "/help", ""),
+            ("/today", "/cohort", "followups"),
+            ("/metrics", "/cohort", "impact"),
+        ]:
+            with self.subTest(command=command):
+                decision = self.arbiter.authorize_command(command, "ignored payload")
+                self.assertEqual((decision.command, decision.prompt), (route, prompt))
+                self.assertFalse(self.arbiter.preflight(route, prompt).model_called)
+
     def test_redact_sensitive_fields(self) -> None:
         redacted = self.arbiter.redact_fields({"chat_id": 12345, "prompt": "secret", "command": "/brief"})
         self.assertEqual(redacted["prompt"], "[redacted]")

@@ -19,11 +19,13 @@ ARBITER = NexusArbiter()
 def build_help_text() -> str:
     return "\n".join(
         [
-            "Available commands:",
+            "AARI Nexus is online. Registration tools:",
+            "/today - registrations needing follow-up",
+            "/metrics - live cohort counts and readiness blockers",
             "/cohort [summary|followups|impact|desk] - live registration counts and staff workspace",
             "/ping - connectivity test",
             "/status - runtime and Azure service status",
-            "/help - show this message",
+            "/start or /help - show this message",
             "/brief <topic> - retrieve memory and prepare an operational brief",
             "/followup <person/company/topic> - draft a follow-up action package for approval",
             "/prep <meeting/person/company> - prepare a meeting/person/company brief",
