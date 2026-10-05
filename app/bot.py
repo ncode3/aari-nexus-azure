@@ -11,6 +11,7 @@ from app.arbiter import NexusArbiter
 from app.azure_openai_client import AzureOpenAIClient
 from app.commands import handle_brief, handle_help, handle_operational_command, handle_ping, handle_status
 from app.config import Settings
+from app.cohort import handle_cohort
 from app.memory import MemoryStore
 from app.pep_client import PepClient
 from app.telemetry import log_event
@@ -85,8 +86,16 @@ class TelegramBotRunner:
             await self._send_message(client, int(chat_id), str(exc))
             return
 
+        # Cohort reporting must fail closed even when the legacy bot allowlist is empty.
+        if decision.command == "/cohort" and int(chat_id) not in self.settings.bot_allowed_chat_ids:
+            await self._send_message(client, int(chat_id), "Cohort Desk requires an explicitly authorized chat.")
+            return
+
         dependency_status = "bot-only"
-        if decision.command == "/ping":
+        if decision.command == "/cohort":
+            reply = await handle_cohort(decision.prompt, self.settings)
+            dependency_status = "sharepoint-read-only"
+        elif decision.command == "/ping":
             reply = await handle_ping(self.settings, command_started)
         elif decision.command == "/help":
             reply = await handle_help()
