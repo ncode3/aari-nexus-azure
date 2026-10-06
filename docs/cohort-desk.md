@@ -2,10 +2,44 @@
 
 Cohort Desk is the staff entry and editing interface. SharePoint remains the
 source of truth. Nexus reads current records on request and returns deterministic
-counts, with links to the staff app and SharePoint views. There is no second
-student database, scheduled synchronization, or model-generated enrollment count.
-External application forms are not synchronized. A zero SharePoint count is not
-evidence of zero submissions in Smartsheet, Jotform, or another intake system.
+counts, with links to the staff app and SharePoint views. Nexus does not maintain a
+second student database or generate enrollment counts with a model. The October
+2026 Jotform application now imports new submissions through Jotform's native
+SharePoint integration. A zero SharePoint count is not evidence of zero submissions
+in other forms, Smartsheet, or an intake system whose delivery has failed.
+
+## October 2026 application intake
+
+Form `262534604751052` has one enabled **Add Row to Existing List** action targeting
+the Cohort Registrations list. Existing-submission replay was left unchecked.
+
+| SharePoint column | Jotform source |
+| --- | --- |
+| Participant | Student Full Name |
+| Cohort | Form Title |
+| JotformSubmissionId | Submission ID |
+| ReferralSource | Referring school or community organization |
+| FollowUpNotes | Submission URL |
+
+Student Full Name is a hidden text field. A native condition joins the student
+First Name, a space, and Last Name as text when Last Name is filled. A live-form
+check verified the combined value and recalculation after a first-name change.
+The adult contact name is not used for Participant.
+
+On October 6, 2026, synthetic submission `6671039472329506398` automatically
+created a SharePoint row with all five mappings. It contained no student contact
+data or consent affirmation. Its Stage was New, GuardianConsent Pending, and all
+three readiness checkboxes false. The row was then marked IsTest=true and was
+excluded from the saved production roster after refresh. This verifies one
+delivery; it does not establish delivery latency, staff time saved, or enrollment
+growth. The submission ID is retained for reconciliation; duplicate protection
+must not be inferred merely from the presence of that column.
+
+Staff must review the original application, assign follow-up ownership and date,
+and independently verify registration, scheduling, transportation and consent.
+An imported application is not a confirmed enrollment. New imported rows have no
+assigned follow-up owner or date by default and therefore appear as unassigned
+and undated in the pending follow-up report.
 
 The deployment includes `aiohttp`, required by Azure Identity's async credentials.
 CI checks that the Azure async transport can be constructed after dependency
