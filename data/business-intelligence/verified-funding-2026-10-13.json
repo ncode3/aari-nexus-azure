@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-10-13",
+  "goal_usd": 10000000,
+  "source": "Gmail full-thread review",
+  "records": [
+    {
+      "id": "qts-2026",
+      "organization": "QTS",
+      "stage": "awarded",
+      "awarded_usd": 15000,
+      "received_usd": 15000,
+      "received_verified": true,
+      "purpose": "2026 general operating support",
+      "evidence_message_id": "19ed574430b1fa01",
+      "notes": "User confirmed check received 2026-10-13; deposit/clearing not independently verified.",
+      "receipt_evidence": "user_attestation_2026-10-13"
+    },
+    {
+      "id": "truist-equipment-2026",
+      "organization": "Truist Trusteed Foundations",
+      "stage": "pre_application",
+      "proposed_usd": 100000,
+      "awarded_usd": 0,
+      "received_usd": 0,
+      "evidence_message_id": "1a1305a1e5db5d63",
+      "next_action": "Speak with Kristina Christy before submitting; include board member list; resolve one-year operating history eligibility."
+    },
+    {
+      "id": "salesforce-agents-2027",
+      "organization": "Salesforce Accelerator - Agents for Impact",
+      "stage": "letter_of_interest_received",
+      "proposed_usd": null,
+      "awarded_usd": 0,
+      "received_usd": 0,
+      "evidence_message_id": "1a11c18486ed7605",
+      "deadline": "2027-02-01",
+      "notes": "Selection and evaluation estimated around six months after LOI closing date."
+    },
+    {
+      "id": "sba-scale-2026",
+      "organization": "SBA SCALE",
+      "stage": "not_selected",
+      "awarded_usd": 0,
+      "received_usd": 0,
+      "evidence_message_id": "1a11c5d74209ecb3",
+      "notes": "Formal non-selection; no debriefings offered."
+    }
+  ]
+}
