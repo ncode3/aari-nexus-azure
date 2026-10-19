@@ -58,7 +58,7 @@ Only after Gate D call the system 'live'.
 - Azure SQL and managed identity wiring not established.
 - Current Container App template uses ephemeral /tmp SQLite memory and may scale to zero.
 - New endpoints require token auth but should be replaced with Entra-backed auth and authorization before production.
-- Tests are committed but not reported as executed.
+- Implementation commit 83c666a4c4a95ca93d96eb32bf6e0e9b99e305ff passed 80 unit/HTTP tests and Bicep compilation in PR CI. SQL staging, live permissions/connectivity and production E2E acceptance remain unrun.
 
 ## Model strategy
 Phase 1: Azure OpenAI LLM + retrieval + SQL tools.
