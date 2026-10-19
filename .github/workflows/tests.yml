@@ -18,3 +18,13 @@ jobs:
         run: python -c "from azure.core.pipeline.transport import AioHttpTransport; AioHttpTransport()"
       - run: python -m compileall -q app infra
       - run: python -m unittest discover -s tests -v
+      - name: Compile existing-resource SQL Bicep (no Azure login or deployment)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --output "$RUNNER_TEMP/bicep" https://github.com/Azure/bicep/releases/download/v0.48.1/bicep-linux-x64
+          echo "b09ec25a9d376c1f8e33ede6ed22b587f915ad68488d5db77a6f9541748c7f6e  $RUNNER_TEMP/bicep" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/bicep"
+          "$RUNNER_TEMP/bicep" build infra/intelligence/existing-sql.bicep --outfile "$RUNNER_TEMP/existing-sql.json"
+          "$RUNNER_TEMP/bicep" build infra/intelligence/private-link-proposal.bicep --outfile "$RUNNER_TEMP/private-link-proposal.json"
+          python scripts/validate_existing_sql_template.py "$RUNNER_TEMP/existing-sql.json"

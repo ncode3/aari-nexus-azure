@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 class EmailRAG:
@@ -12,10 +13,15 @@ class EmailRAG:
             db.execute("CREATE TABLE IF NOT EXISTS email_docs (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL, timestamp TEXT, source_url TEXT NOT NULL)")
             db.execute("CREATE VIRTUAL TABLE IF NOT EXISTS email_search USING fts5(id UNINDEXED, subject, body, tokenize='unicode61')")
             db.execute("CREATE TABLE IF NOT EXISTS email_sync_state (source TEXT PRIMARY KEY, cursor TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+    @contextmanager
     def connect(self):
         db = sqlite3.connect(self.path)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
     def ingest(self, docs):
         count = 0
         with self.connect() as db:

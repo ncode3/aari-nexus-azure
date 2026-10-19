@@ -1,0 +1,19 @@
+{
+  "evidence_level": "user_confirmed_deployment",
+  "evidence_reference": "User deployment confirmation in this work order, 2026-10-13",
+  "resource_group": "rg-aari-intelligence-dev-eus-001",
+  "server": "sql-aari-intel-dev-eus-001",
+  "database": "sqldb-aari-nexus-intel-dev",
+  "region_display": "West US",
+  "region": "westus",
+  "entra_only_authentication": true,
+  "sql_public_network_access": "Disabled",
+  "use_free_limit": true,
+  "free_limit_exhaustion_behavior": "AutoPause",
+  "monthly_intelligence_budget_ceiling_usd": 50,
+  "subscription_id": null,
+  "tenant_id": null,
+  "application_connectivity_verified": false,
+  "application_entra_authorization_verified": false,
+  "complete_monthly_cost_verified": false
+}

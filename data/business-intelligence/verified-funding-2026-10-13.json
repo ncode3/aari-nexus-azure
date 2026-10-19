@@ -13,8 +13,14 @@
       "received_verified": true,
       "purpose": "2026 general operating support",
       "evidence_message_id": "19ed574430b1fa01",
-      "notes": "User confirmed check received 2026-10-13; deposit/clearing not independently verified.",
-      "receipt_evidence": "user_attestation_2026-10-13"
+      "notes": "Executive confirms $15,000 deposited as of 2026-10-13; independent bank clearing/reconciliation remains unknown.",
+      "receipt_evidence": "user_attestation_2026-10-13",
+      "deposited_usd": 15000,
+      "deposited_confirmed": true,
+      "deposit_evidence": "executive_confirmation_2026-10-13",
+      "deposit_evidence_kind": "EXECUTIVE_CONFIRMATION",
+      "bank_reconciled_usd": null,
+      "bank_reconciled_verified": false
     },
     {
       "id": "truist-equipment-2026",

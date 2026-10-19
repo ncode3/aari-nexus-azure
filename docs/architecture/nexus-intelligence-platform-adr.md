@@ -12,14 +12,14 @@ Reuse the EXISTING AARI Azure SQL database as the structured business intelligen
 1. Sources: Gmail correspondence, approved student-registration source, partnerships, grants, internships, facility/power blockers, and existing Azure SQL records.
 2. Authenticated incremental ingestion: Gmail API OAuth with narrow read-only scopes, encrypted refresh credentials in Key Vault, least-privilege managed identity for Azure resources. Use Azure Functions timer/queue or existing Azure workload if suitable. Handle pagination, history cursors, expiration/full resync, retries, 429s, idempotency, deletes, and source provenance.
 3. Normalization: organizations, contacts, opportunities, actions, evidence documents, chunks, student program outcomes. Maintain raw message metadata and redacted/minimized content only where needed. Store unique Gmail message and thread IDs and timestamps. Do not sync sensitive student details without approved access.
-4. SQL: canonical financial states PROPOSED, SUBMITTED, AWARDED, RECEIVED, DEPOSITED (deposit requires bank reconciliation); never sum these states together. Track amount, currency, evidence, verification source, confidence, and time.
+4. SQL: canonical financial states PROPOSED, SUBMITTED, AWARDED, RECEIVED, DEPOSITED (executive confirmation or bank evidence, with basis retained), RECONCILED (requires independent bank evidence); never sum these states together. Track amount, currency, evidence, verification source, confidence, and time.
 5. Retrieval: hybrid SQL filtering + full-text + semantic vector ranking, with authorization checks before retrieval, citations to source messages, and injection-resistant evidence boundaries. Structured queries determine metrics; LLM narrates and explains.
 6. Serving: secure API endpoint in existing FastAPI/Container Apps service, accessible to authorized Nexus clients. ChatGPT direct access is possible only through currently available connectors or a separately approved connector/API integration. ChatGPT access to GitHub and Gmail does NOT itself establish a live Azure SQL connection.
 7. UI: existing Power BI/Power Apps/Nexus dashboards consume SQL views; natural-language questions return a grounded answer, evidence links, freshness, and confidence.
 8. Monitoring: Application Insights, failed sync alerts, stale source checks, cost and latency tracking, retrieval evaluation, access audit.
 
 ## Verified business fact
-QTS 2026 grant: $15,000 awarded and user confirms physical check received as of 2026-10-13. Mark RECEIVED with evidence=user attestation; do not mark DEPOSITED or CLEARED without bank evidence. The funding JSON in this feature branch has been updated accordingly.
+QTS 2026 grant: $15,000 awarded and user confirms physical check received as of 2026-10-13. Mark RECEIVED and DEPOSITED with evidence=executive confirmation as of 2026-10-13; independently CLEARED/RECONCILED remains unknown without bank evidence. The funding JSON in this feature branch has been updated accordingly.
 
 ## Codex work packages, in order
 0. Discovery (read-only): identify existing Azure subscription/resource group, Azure SQL server/database SKU, schema, authentication, network boundaries, managed identity, Key Vault, current Container App revisions, Azure OpenAI deployment, Power BI/Power Apps sources, and any existing ingestion. Output an inventory and dependency map; never paste secrets. Do not create duplicate infrastructure.
@@ -31,7 +31,7 @@ QTS 2026 grant: $15,000 awarded and user confirms physical check received as of 
 6. Controlled rollout: tests in dev/staging, approved migrations, deploy, health probes, production smoke tests, documented rollback. Never auto-merge or change production credentials without approval.
 
 ## Nonnegotiable acceptance tests
-- Query 'How much did QTS award and have we received the check?' -> awarded $15,000; received $15,000 per user confirmation; deposit unverified; cite award email and user attestation.
+- Query 'How much did QTS award and have we received the check?' -> awarded $15,000; received $15,000 per user confirmation; deposited $15,000 per executive confirmation; independent bank reconciliation unknown; cite award email and confirmation.
 - Query 'How much of the $10M goal is confirmed?' -> correct SQL aggregate, no double counting of proposed/awarded/received, timestamp and source.
 - Query 'Which opportunities were rejected?' -> SBA SCALE identified as not selected, cited.
 - Query 'Which employers have committed internships?' -> only documented commitments, not outreach.

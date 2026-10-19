@@ -13,6 +13,7 @@ from app.commands import handle_brief, handle_help, handle_operational_command, 
 from app.config import Settings
 from app.cohort import handle_cohort
 from app.memory import MemoryStore
+from app.intelligence_policy import telegram_chat_allowed
 from app.pep_client import PepClient
 from app.telemetry import log_event
 
@@ -74,7 +75,7 @@ class TelegramBotRunner:
         if not chat_id or not text:
             return
 
-        if self.settings.bot_allowed_chat_ids and int(chat_id) not in self.settings.bot_allowed_chat_ids:
+        if not telegram_chat_allowed(int(chat_id), self.settings.bot_allowed_chat_ids):
             await self._send_message(client, int(chat_id), "Unauthorized chat.")
             return
 

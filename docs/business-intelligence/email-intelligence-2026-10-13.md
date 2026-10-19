@@ -2,6 +2,9 @@
 
 Date: 2026-10-13. Status: exploratory evidence, not verified financial or enrollment reporting. Source: authenticated Gmail searches; email subjects and labels, not full-thread adjudication. This document is intended for Nexus ingestion; repository storage is not evidence of live Azure ingestion.
 
+## Financial status update (2026-10-13)
+QTS $15,000 is awarded, received and deposited per executive confirmation. Independent bank clearing/reconciliation remains unknown. Truist $100,000 remains a proposed equipment ask and the first proposed-opportunity acceptance case; budget control is not established by naming its contact. The exploratory signals below remain historical discovery evidence.
+
 ## Scope and counts
 - `label:"AARI/02 Grants & Funding" newer_than:180d`: 96 matching messages, no next page.
 - `label:"AARI/03 Partners" newer_than:90d`: first 98 returned, additional page present.

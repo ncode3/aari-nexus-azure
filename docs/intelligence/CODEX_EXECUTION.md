@@ -1,9 +1,9 @@
 # Codex Execution Instructions: AARI Nexus Intelligence Platform
 
-**Status:** Engineering work order. **Start with read-only discovery.**  
-**Repository:** `ncode3/aari-nexus-azure`  
-**Working branch:** `feature/email-intelligence-ingestion`  
-**Draft PR:** https://github.com/ncode3/aari-nexus-azure/pull/29  
+**Status:** Engineering work order. **Start with read-only discovery.**
+**Repository:** `ncode3/aari-nexus-azure`
+**Working branch:** `feature/email-intelligence-ingestion`
+**Draft PR:** https://github.com/ncode3/aari-nexus-azure/pull/29
 **Architecture decision:** [nexus-intelligence-platform-adr.md](../architecture/nexus-intelligence-platform-adr.md)
 
 ## Mission
@@ -24,13 +24,15 @@ Deliver an end-to-end, production-validated intelligence capability that lets AA
 
 ## Canonical initial facts and caveats
 
-- QTS awarded **$15,000** for 2026 general operating support. The AARI executive director confirms the check **was received** (2026-10-13). Mark awarded=$15,000 and check_received=$15,000 on that basis; deposited/cleared is **unknown** until reconciled from banking evidence.
+- QTS awarded **$15,000** for 2026 general operating support. The AARI executive director confirms the check **was received** (2026-10-13). Mark awarded=$15,000, check_received=$15,000 and deposited=$15,000 on executive confirmation as of 2026-10-13. Independently bank-cleared/reconciled remains **unknown**; do not promote an attestation to bank reconciliation.
 - Truist Trusteed Foundations **$100,000** equipment ask is a **proposed request**, not an award. Kristina Christy requested a conversation before application and a board-member list. One-year operation eligibility remains unresolved.
 - Salesforce Agents for Impact acknowledged a letter of interest. The updated closing date is **2027-02-01**; selection to follow. No grant award established.
 - SBA SCALE sent formal **non-selection**. Award=$0.
 - Do not commit whole Gmail thread bodies to Git. The prototype file `data/business-intelligence/verified-funding-2026-10-13.json` is an evidence-backed seed, not a continuously reconciled ledger.
 
 ## Phase 0: Read-only fact finding, no infrastructure modifications
+
+Execution update (2026-10-13): accept user-provided Azure Cloud Shell inventory as verified resource evidence. Do not repeat discovery from the restricted local environment. Inventory does not prove application connectivity, effective identity permissions, network security, or pricing. Prepare review artifacts on `feature/email-intelligence-ingestion`; if the checkout is read-only, deliver a patch with application instructions. Provisioning, migration, and deployment remain blocked pending connectivity, pricing, identity, network, schema and data-access review. See [review package](review-package.md).
 
 Inspect real Azure configuration with authorized identity and capture a redacted report:
 
@@ -78,7 +80,8 @@ Required automated and human-tested scenarios:
 
 | Scenario | Expected evidence |
 | --- | --- |
-| "How much did QTS award and have we received it?" | Awarded $15,000; check received $15,000 by AARI confirmation; bank deposit/clearing unknown; link to award source |
+| "Who should AARI approach next, how much should we request, who controls the budget, and why?" | Reviewed priority; proposed ask and currency; contact distinct from evidenced budget controller; authorized citations, blockers and freshness; explicit unknowns when authority or amount is unsupported. Current Truist seed supports a discovery conversation about $100K, not an approved application or verified budget controller. |
+| "How much did QTS award and have we received it?" | Awarded $15,000; check received and deposited $15,000 per executive confirmation; independent bank clearing/reconciliation unknown; cite source and confirmation |
 | "How much of our $10M goal is verified?" | Deterministic SQL total by award/received category, no double counting |
 | "What happened to SBA SCALE?" | Not selected; source citation |
 | "Is Truist's $100K secured?" | No; proposed request and eligibility blockers |

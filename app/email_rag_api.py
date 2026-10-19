@@ -5,15 +5,20 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
 from app.email_rag import EmailRAG
 from app.email_intelligence import build_funding_dashboard
+from app.intelligence_policy import prototype_api_allowed
 
 router = APIRouter(prefix="/internal/email-intelligence", tags=["email-intelligence"])
 
 def authorize(token: str | None):
+    if not prototype_api_allowed(os.environ):
+        raise HTTPException(503, "Intelligence API awaits reviewed SQL and Entra integration")
     expected = os.getenv("NEXUS_EMAIL_INTELLIGENCE_TOKEN")
-    if not expected or not token:
+    if not expected:
         raise HTTPException(503, "Email intelligence API is not configured")
+    if not token:
+        raise HTTPException(401, "Authentication required")
     import hmac
-    if not hmac.compare_digest(token, expected):
+    if not hmac.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
         raise HTTPException(403, "Forbidden")
 
 class IngestPayload(BaseModel):
