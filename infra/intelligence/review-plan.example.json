@@ -1,0 +1,83 @@
+{
+  "source_branch": "feature/email-intelligence-ingestion",
+  "source_commit": "3709e8c92a6b02b9f85835a56f489b0a9c3ec5ee",
+  "inventory": {
+    "state": "provided_verified",
+    "evidence_reference": "docs/intelligence/discovery-inventory.md; user-confirmed SQL deployment + Cloud Shell findings recorded in cost gate"
+  },
+  "resources": {
+    "sql_server_id": "",
+    "sql_database_id": "",
+    "managed_identity_id": "",
+    "container_app_id": ""
+  },
+  "network": {
+    "mode": "unresolved",
+    "private_endpoint_subnet_id": "",
+    "private_dns_zone_id": "",
+    "private_endpoint_name": "",
+    "location": "",
+    "dns_and_routing_evidence": ""
+  },
+  "pricing": {
+    "currency": "USD",
+    "baseline_monthly_usd": null,
+    "estimated_monthly_delta_usd": null,
+    "approved_monthly_delta_limit_usd": 50,
+    "sku_change_requested": false,
+    "estimate_reference": "",
+    "monthly_budget_ceiling_usd": 50
+  },
+  "reviews": {
+    "connectivity": {
+      "state": "pending",
+      "reviewer": "",
+      "evidence_reference": ""
+    },
+    "pricing": {
+      "state": "pending",
+      "reviewer": "",
+      "evidence_reference": ""
+    },
+    "identity_permissions": {
+      "state": "pending",
+      "reviewer": "",
+      "evidence_reference": ""
+    },
+    "network_design": {
+      "state": "pending",
+      "reviewer": "",
+      "evidence_reference": ""
+    },
+    "schema_migration": {
+      "state": "pending",
+      "reviewer": "",
+      "evidence_reference": ""
+    },
+    "data_access": {
+      "state": "pending",
+      "reviewer": "",
+      "evidence_reference": ""
+    }
+  },
+  "deployment_authorized": false,
+  "sql_binding": {
+    "evidence_level": "user_confirmed_deployment",
+    "evidence_reference": "User deployment confirmation in this work order, 2026-10-13",
+    "resource_group": "rg-aari-intelligence-dev-eus-001",
+    "server": "sql-aari-intel-dev-eus-001",
+    "database": "sqldb-aari-nexus-intel-dev",
+    "region_display": "West US",
+    "region": "westus",
+    "entra_only_authentication": true,
+    "sql_public_network_access": "Disabled",
+    "use_free_limit": true,
+    "free_limit_exhaustion_behavior": "AutoPause",
+    "monthly_intelligence_budget_ceiling_usd": 50,
+    "subscription_id": null,
+    "tenant_id": null,
+    "application_connectivity_verified": false,
+    "application_entra_authorization_verified": false,
+    "complete_monthly_cost_verified": false
+  }
+}

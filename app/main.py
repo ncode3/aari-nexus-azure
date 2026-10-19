@@ -10,6 +10,7 @@ from app.bot import TelegramBotRunner
 from app.config import get_settings, validate_settings
 from app.pep_client import PepClient
 from app.telemetry import configure_logging, log_event
+from app.email_rag_api import router as email_intelligence_router
 
 
 settings = get_settings()
@@ -33,6 +34,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="AARI Nexus Azure", version=settings.app_version, lifespan=lifespan)
+app.include_router(email_intelligence_router)
 
 
 @app.get("/healthz")

@@ -29,8 +29,8 @@ image_name = f"aari-nexus-azure:{image_tag}"
 
 cohort_graph_enabled = config.get_bool("cohortGraphEnabled") or False
 bot_allowed_chat_ids = config.get("botAllowedChatIds") or ""
-if cohort_graph_enabled and not bot_allowed_chat_ids.strip():
-    raise ValueError("Set botAllowedChatIds before enabling Cohort Desk reporting.")
+if not bot_allowed_chat_ids.strip():
+    raise ValueError("Set an explicitly approved botAllowedChatIds allowlist before deployment.")
 cohort_env = [
     app.EnvironmentVarArgs(name="COHORT_GRAPH_ENABLED", value=str(cohort_graph_enabled).lower()),
 ]
