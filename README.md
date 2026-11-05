@@ -276,3 +276,8 @@ follow-up counts directly from SharePoint and links back to the staff app.
 Test records are excluded. Live reporting requires deployment and selected
 SharePoint read access for the existing identity; it is disabled by default.
 See [Cohort Desk integration](docs/cohort-desk.md) for activation and verification.
+
+## Local runtime
+
+Run the existing bot on your Ollama machine with persistent local memory and no
+automatic paid fallback. See [local setup, backup and cutover](docs/local-runtime.md).

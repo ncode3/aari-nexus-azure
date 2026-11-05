@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI
 
-from app.azure_openai_client import AzureOpenAIClient
+from app.model_client import create_model_client
 from app.bot import TelegramBotRunner
 from app.config import get_settings, validate_settings
 from app.pep_client import PepClient
@@ -16,7 +16,7 @@ settings = get_settings()
 validate_settings(settings)
 configure_logging(settings)
 started_at = datetime.now(UTC)
-openai_client = AzureOpenAIClient(settings)
+openai_client = create_model_client(settings)
 pep_client = PepClient(settings)
 bot_runner = TelegramBotRunner(settings, openai_client, pep_client, started_at)
 
