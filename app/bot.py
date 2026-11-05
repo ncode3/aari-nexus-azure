@@ -104,7 +104,7 @@ class TelegramBotRunner:
             dependency_status = ",".join(f"{name}={status}" for name, status in services.items())
         elif decision.command == "/brief":
             reply = await handle_brief(decision.prompt, self.settings, self.openai_client, self.memory_store)
-            dependency_status = "arbiter-preflight,memory,azure-openai"
+            dependency_status = f"arbiter-preflight,memory,{self.settings.model_provider}"
         elif decision.command in {"/remember", "/find", "/followup", "/prep", "/draft", "/task"}:
             reply = await handle_operational_command(
                 decision.command,

@@ -4,6 +4,8 @@ import json
 import logging
 from datetime import UTC, datetime
 from io import BytesIO
+from pathlib import Path
+import uuid
 
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -45,6 +47,19 @@ async def upload_artifact(
     filename: str,
     payload: dict[str, object],
 ) -> str | None:
+    if settings.local_artifact_path:
+        # Never accept traversal through artifact names; use a private local root.
+        if any(not value or Path(value).name != value or value in {".", ".."}
+               or "/" in value or "\\" in value
+               for value in (artifact_kind, filename)):
+            raise ValueError("Artifact kind and filename must be simple names")
+        directory = Path(settings.local_artifact_path) / artifact_kind
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        target = directory / f"{uuid.uuid4().hex}-{filename}"
+        with target.open("x", encoding="utf-8") as output:
+            target.chmod(0o600)
+            json.dump(ARBITER.redact_fields(payload), output, indent=2)
+        return str(target)
     if not settings.azure_storage_connection_string and not settings.azure_storage_account_url:
         return None
 

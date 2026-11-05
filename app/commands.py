@@ -80,10 +80,11 @@ async def handle_status(
     }
     return "\n".join(
         [
-            "AARI Nexus Azure status",
+            "AARI Nexus Azure status" if settings.model_provider == "azure" else "AARI Nexus Local status",
+            f"model_provider: {settings.model_provider}",
             f"azure_service_health: {services}",
             f"pep_base_url: {pep_status['base_url']}",
-            f"model_name: {settings.azure_openai_deployment}",
+            f"model_name: {settings.ollama_model if settings.model_provider == 'ollama' else settings.azure_openai_deployment}",
             f"region: {settings.azure_region}",
             f"app_version: {settings.app_version}",
             f"uptime_seconds: {uptime}",
