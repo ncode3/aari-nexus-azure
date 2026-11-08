@@ -153,6 +153,13 @@ async def handle_operational_command(
     cleaned = payload.strip()
     if not cleaned:
         return f"Usage: {command} <topic or request>"
+    if command in {'/prep', '/followup', '/draft', '/task'}:
+        decision = ARBITER.preflight(command, cleaned)
+        log_event('arbiter.preflight', **ARBITER.build_decision_log(decision))
+        if decision.decision in {'block', 'escalate'}:
+            return decision.user_response or 'Explicit review and approval required.'
+        if decision.decision == 'modify':
+            cleaned = decision.safe_prompt or cleaned
 
     routed = classify_intent(command, cleaned)
     original_command = f"{routed.command} {cleaned}".strip()

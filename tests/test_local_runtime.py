@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -105,5 +106,5 @@ class BackupTests(unittest.TestCase):
             restored = MemoryStore(restore / 'nexus_memory.sqlite3')
             self.assertEqual(len(restored.search_memory('synthetic')), 1)
             self.assertEqual((restore / 'artifacts/example.json').read_text(), '{}')
-            with sqlite3.connect(restored.db_path) as connection:
+            with closing(sqlite3.connect(restored.db_path)) as connection:
                 self.assertEqual(connection.execute('PRAGMA integrity_check').fetchone()[0], 'ok')

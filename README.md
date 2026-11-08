@@ -14,7 +14,10 @@ This repo deploys a private AARI Nexus Telegram backend to Azure Container Apps 
 - an Arbiter layer for command authorization and log redaction
 - Pulumi Python with Azure Native
 
-V1 intentionally does not include AWS, Bedrock, Ollama, Kubernetes, or webhook complexity.
+The optional local profile uses the existing loopback Ollama installation and
+persistent private state. It does not fall back to paid inference. The Azure
+adapter now requires explicit approval for each paid inference job; status probes
+do not purchase completions. Production Azure has not been redeployed by this work.
 
 ## Commands
 
@@ -281,3 +284,6 @@ See [Cohort Desk integration](docs/cohort-desk.md) for activation and verificati
 
 Run the existing bot on your Ollama machine with persistent local memory and no
 automatic paid fallback. See [local setup, backup and cutover](docs/local-runtime.md).
+The local operator defaults to **no Telegram poller**, authenticates every data
+request, and listens on `127.0.0.1:8765`. See the [PR #1 reconciliation](docs/local-platform-reconciliation.md)
+before combining it with the PostgreSQL/MinIO business platform.

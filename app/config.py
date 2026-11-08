@@ -68,6 +68,8 @@ class Settings:
     ollama_model: str = ""
     ollama_base_url: str = "http://127.0.0.1:11434"
     local_artifact_path: str = ""
+    telegram_enabled: bool = True
+    local_api_token: str = ""
 
 
 def _get_secret_client(vault_uri: str) -> SecretClient:
@@ -109,6 +111,8 @@ def get_settings() -> Settings:
         ollama_model=os.getenv("OLLAMA_MODEL", "").strip(),
         ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip(),
         local_artifact_path=os.getenv("NEXUS_LOCAL_ARTIFACT_PATH", "").strip(),
+        telegram_enabled=os.getenv("NEXUS_TELEGRAM_ENABLED", "true").lower() in {"true", "1", "yes"},
+        local_api_token=os.getenv("NEXUS_LOCAL_API_TOKEN", "").strip(),
         telegram_bot_token=_get_env_or_key_vault("TELEGRAM_BOT_TOKEN", azure_key_vault_uri),
         azure_openai_endpoint=_get_env_or_key_vault("AZURE_OPENAI_ENDPOINT", model_vault_uri),
         azure_openai_api_key=_get_env_or_key_vault("AZURE_OPENAI_API_KEY", model_vault_uri),
@@ -149,7 +153,7 @@ def validate_settings(settings: Settings) -> None:
         validate_ollama_url(settings.ollama_base_url)
         if not settings.ollama_model or not settings.bot_allowed_chat_ids:
             raise ValueError("Local mode requires OLLAMA_MODEL and BOT_ALLOWED_CHAT_IDS")
-    required = {"TELEGRAM_BOT_TOKEN": settings.telegram_bot_token}
+    required = {"TELEGRAM_BOT_TOKEN": settings.telegram_bot_token} if settings.telegram_enabled else {}
     if settings.model_provider == "azure":
         required.update({
             "AZURE_OPENAI_ENDPOINT": settings.azure_openai_endpoint,
