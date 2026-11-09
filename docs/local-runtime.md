@@ -71,12 +71,35 @@ not a migration of existing Azure blobs, business databases, or a vector index.
 Protect the host account and disk, including backups. The host must remain awake
 for the bot to respond. Review logs and model failures locally.
 
-## Acceptance and backup
+## Browser workspace
+
+Open **http://127.0.0.1:8765/** (or http://localhost:8765/). This is the browser
+interface; `/healthz` remains the JSON health endpoint. Enter the existing
+`NEXUS_LOCAL_API_TOKEN` from `%LOCALAPPDATA%\AARI\Nexus\.env.local` to unlock.
+No token is embedded in the page, placed in the URL, or written to browser storage.
+Locking or reloading clears the credential and the visible conversation.
+
+Chat sends ordinary messages through the existing `/brief` command, retrieving
+saved memory before local Ollama inference. Slash commands retain their Arbiter
+checks. The Memory panel searches and explicitly saves to the existing persistent
+SQLite store. The conversation view stays in the tab; commands and generated
+action packages continue to be recorded in the existing local store.
+Runtime status shows the model's availability, memory count, Telegram state and
+disabled paid inference. A failed local model returns an error without fallback.
+
+Browser requests need both a valid bearer token and an exact matching origin
+(scheme, host and port). Cross-origin and cross-site requests remain blocked;
+there are no authentication cookies, external assets, CORS grants or public model
+endpoints. The unlocked page uses the configured allowed operator ID. Public UI
+files contain no memory, configuration values or credentials. Azure and Telegram
+settings are unchanged.
+
+## API acceptance and backup
 
 All `/local/*` routes require `Authorization: Bearer <NEXUS_LOCAL_API_TOKEN>`.
 `POST /local/command` accepts `{"chat_id": <allowed-id>, "text": "/find topic"}`.
 Its command path reuses the existing memory, agents, Arbiter and Cohort Desk links.
-Invalid tokens return 401; unlisted chats, browser-origin requests and unexpected
+Invalid tokens return 401; unlisted chats, cross-origin requests and unexpected
 Host headers are rejected. `/healthz` contains no records and is public on loopback.
 There is no CORS grant, public tunnel, model-download endpoint or cloud-job endpoint.
 Small operator attachments use `PUT /local/documents/<simple-name>`, filename

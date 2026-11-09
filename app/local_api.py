@@ -1,5 +1,6 @@
 """Private operator surface, separate from PR #1's /api/v1 business platform."""
 import hashlib
+import asyncio
 import hmac
 import json
 import os
@@ -11,7 +12,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from app.arbiter import NexusArbiter
@@ -72,16 +73,69 @@ def create_app(settings=None, model=None):
     app.state.memory = runner.memory_store
     app.state.runner = runner
 
+    @app.middleware('http')
+    async def local_boundary(request: Request, call_next):
+        from fastapi.responses import JSONResponse
+        host = request.headers.get('host', '').split(':')[0]
+        if host not in {'127.0.0.1', 'localhost', 'testserver'}:
+            response = JSONResponse({'detail': 'Local host required'}, status_code=403)
+        else:
+            response = await call_next(request)
+        response.headers.update({
+            'Cache-Control': 'no-store',
+            'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Referrer-Policy': 'no-referrer',
+            'Cross-Origin-Resource-Policy': 'same-origin',
+        })
+        return response
+
     async def authenticate(request: Request):
-        # Block browser rebinding/cross-origin requests as well as invalid credentials.
-        if request.headers.get('origin'):
-            raise HTTPException(403, 'Browser-origin access is disabled')
+        # Native requests may omit Origin. Browser requests must match exactly,
+        # including scheme, hostname and port; no cookies or CORS grant are used.
+        origin = request.headers.get('origin')
+        if ((origin is not None and origin != str(request.base_url).rstrip('/')) or
+                request.headers.get('sec-fetch-site') in {'cross-site', 'same-site'}):
+            raise HTTPException(403, 'Cross-origin access is disabled')
         host = request.headers.get('host', '').split(':')[0]
         if host not in {'127.0.0.1', 'localhost', 'testserver'}:
             raise HTTPException(403, 'Local host required')
         supplied = request.headers.get('authorization', '')
         if not hmac.compare_digest(supplied.encode(), ('Bearer ' + settings.local_api_token).encode()):
             raise HTTPException(401, 'Unauthorized')
+
+    web = Path(__file__).resolve().parent / 'web'
+
+    @app.get('/')
+    async def homepage():
+        return FileResponse(web / 'index.html', media_type='text/html')
+
+    @app.get('/ui/app.js')
+    async def browser_script():
+        return FileResponse(web / 'app.js', media_type='text/javascript')
+
+    @app.get('/ui/styles.css')
+    async def browser_style():
+        return FileResponse(web / 'styles.css', media_type='text/css')
+
+    @app.get('/favicon.ico')
+    async def favicon():
+        return Response(status_code=204)
+
+    @app.get('/local/runtime', dependencies=[Depends(authenticate)])
+    async def runtime():
+        try:
+            probe = await asyncio.wait_for(model.probe(), timeout=3)
+            available = bool(probe.get('healthy'))
+        except (httpx.HTTPError, TimeoutError, ValueError):
+            available = False
+        with runner.memory_store._connect() as connection:
+            count = connection.execute('SELECT COUNT(*) FROM memories').fetchone()[0]
+        return {'model': settings.ollama_model, 'model_available': available,
+                'operator_id': sorted(settings.bot_allowed_chat_ids)[0],
+                'memory_records': count, 'telegram_polling': settings.telegram_enabled,
+                'paid_cloud': 'disabled', 'uptime_seconds': int((datetime.now(UTC) - started).total_seconds())}
 
     @app.get('/healthz')
     async def health():
