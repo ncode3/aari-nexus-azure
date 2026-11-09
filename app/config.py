@@ -64,6 +64,12 @@ class Settings:
     cohort_queue_url: str = "https://aari.sharepoint.com/sites/AARICohortDesk/Lists/Cohort%20Registrations/Followup%20Queue.aspx"
     cohort_summary_url: str = "https://aari.sharepoint.com/sites/AARICohortDesk/Lists/Cohort%20Registrations/Cohort%20Summary.aspx"
     cohort_max_pages: int = 100
+    model_provider: str = "azure"
+    ollama_model: str = ""
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    local_artifact_path: str = ""
+    telegram_enabled: bool = True
+    local_api_token: str = ""
 
 
 def _get_secret_client(vault_uri: str) -> SecretClient:
@@ -96,13 +102,22 @@ def _get_env_or_key_vault(name: str, vault_uri: str | None) -> str:
 
 
 def get_settings() -> Settings:
+    model_provider = os.getenv("NEXUS_MODEL_PROVIDER", "azure").strip().lower()
     azure_key_vault_uri = os.getenv("AZURE_KEY_VAULT_URI", "").strip() or None
+    # Local inference must not fetch Azure model credentials from Key Vault.
+    model_vault_uri = azure_key_vault_uri if model_provider == "azure" else None
     return Settings(
+        model_provider=model_provider,
+        ollama_model=os.getenv("OLLAMA_MODEL", "").strip(),
+        ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip(),
+        local_artifact_path=os.getenv("NEXUS_LOCAL_ARTIFACT_PATH", "").strip(),
+        telegram_enabled=os.getenv("NEXUS_TELEGRAM_ENABLED", "true").lower() in {"true", "1", "yes"},
+        local_api_token=os.getenv("NEXUS_LOCAL_API_TOKEN", "").strip(),
         telegram_bot_token=_get_env_or_key_vault("TELEGRAM_BOT_TOKEN", azure_key_vault_uri),
-        azure_openai_endpoint=_get_env_or_key_vault("AZURE_OPENAI_ENDPOINT", azure_key_vault_uri),
-        azure_openai_api_key=_get_env_or_key_vault("AZURE_OPENAI_API_KEY", azure_key_vault_uri),
-        azure_openai_deployment=_get_env_or_key_vault("AZURE_OPENAI_DEPLOYMENT", azure_key_vault_uri),
-        azure_openai_api_version=_get_env_or_key_vault("AZURE_OPENAI_API_VERSION", azure_key_vault_uri) or "2024-10-21",
+        azure_openai_endpoint=_get_env_or_key_vault("AZURE_OPENAI_ENDPOINT", model_vault_uri),
+        azure_openai_api_key=_get_env_or_key_vault("AZURE_OPENAI_API_KEY", model_vault_uri),
+        azure_openai_deployment=_get_env_or_key_vault("AZURE_OPENAI_DEPLOYMENT", model_vault_uri),
+        azure_openai_api_version=_get_env_or_key_vault("AZURE_OPENAI_API_VERSION", model_vault_uri) or "2024-10-21",
         azure_region=os.getenv("AZURE_REGION", "eastus").strip(),
         app_version=os.getenv("APP_VERSION", "0.3.0").strip(),
         app_env=os.getenv("APP_ENV", "dev").strip(),
@@ -131,13 +146,21 @@ def get_settings() -> Settings:
 
 
 def validate_settings(settings: Settings) -> None:
-    required = {
-        "TELEGRAM_BOT_TOKEN": settings.telegram_bot_token,
-        "AZURE_OPENAI_ENDPOINT": settings.azure_openai_endpoint,
-        "AZURE_OPENAI_API_KEY": settings.azure_openai_api_key,
-        "AZURE_OPENAI_DEPLOYMENT": settings.azure_openai_deployment,
-        "AZURE_OPENAI_API_VERSION": settings.azure_openai_api_version,
-    }
+    if settings.model_provider not in {"azure", "ollama"}:
+        raise ValueError("NEXUS_MODEL_PROVIDER must be azure or ollama")
+    if settings.model_provider == "ollama":
+        from app.ollama_local_client import validate_ollama_url
+        validate_ollama_url(settings.ollama_base_url)
+        if not settings.ollama_model or not settings.bot_allowed_chat_ids:
+            raise ValueError("Local mode requires OLLAMA_MODEL and BOT_ALLOWED_CHAT_IDS")
+    required = {"TELEGRAM_BOT_TOKEN": settings.telegram_bot_token} if settings.telegram_enabled else {}
+    if settings.model_provider == "azure":
+        required.update({
+            "AZURE_OPENAI_ENDPOINT": settings.azure_openai_endpoint,
+            "AZURE_OPENAI_API_KEY": settings.azure_openai_api_key,
+            "AZURE_OPENAI_DEPLOYMENT": settings.azure_openai_deployment,
+            "AZURE_OPENAI_API_VERSION": settings.azure_openai_api_version,
+        })
     missing = [name for name, value in required.items() if not value]
     if missing:
         raise ValueError(f"Missing required environment variables: {', '.join(missing)}")

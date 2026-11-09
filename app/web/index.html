@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AARI Nexus · Local workspace</title>
+  <link rel="stylesheet" href="/ui/styles.css">
+  <script src="/ui/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="AARI Nexus home"><span class="brand-mark">N</span><span>AARI <strong>Nexus</strong><small>Local workspace</small></span></a>
+    <div class="connection"><span id="connection-label" role="status">Locked</span><button id="disconnect" class="quiet" hidden>Lock workspace</button></div>
+  </header>
+  <main>
+    <section id="unlock-panel" class="unlock card" aria-labelledby="unlock-title">
+      <p class="eyebrow">Your private workspace</p>
+      <h1 id="unlock-title">Connect to Nexus.</h1>
+      <p>Chat with your local model, recall what matters, and keep useful context in memory.</p>
+      <form id="unlock-form">
+        <label for="api-token">Local API token</label>
+        <div class="unlock-row"><input id="api-token" type="password" required minlength="32" autocomplete="off" spellcheck="false" placeholder="Enter your local API token"><button type="submit">Unlock</button></div>
+      </form>
+      <p class="hint">Use <code>NEXUS_LOCAL_API_TOKEN</code> from your private <code>%LOCALAPPDATA%\AARI\Nexus\.env.local</code> file. The token stays in this tab’s memory and is cleared when you lock or reload.</p>
+      <p id="unlock-error" class="error" role="alert"></p>
+    </section>
+    <div id="workspace" hidden>
+      <section class="intro"><div><p class="eyebrow">A little context. A clear next step.</p><h1>Your local thinking space.</h1></div><button id="refresh-status" class="quiet">Refresh status</button></section>
+      <section class="status-grid" aria-label="Runtime status">
+        <div class="status-card"><span>Local model</span><strong id="model-name">—</strong><small id="model-status">Checking Ollama</small></div>
+        <div class="status-card"><span>Persistent memory</span><strong id="memory-count">—</strong><small>Stored on this machine</small></div>
+        <div class="status-card"><span>Cloud inference</span><strong>Disabled</strong><small>No paid fallback</small></div>
+        <div class="status-card"><span>Telegram</span><strong id="telegram-status">Disabled</strong><small id="uptime">Local operator</small></div>
+      </section>
+      <p id="workspace-error" class="error" role="alert"></p>
+      <div class="workspace-grid">
+        <section class="card chat-card" aria-labelledby="chat-title">
+          <div class="card-heading"><div><p class="eyebrow">Think it through</p><h2 id="chat-title">Chat with Nexus</h2></div><span class="local-badge">Ollama · local</span></div>
+          <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions"><p class="empty" id="chat-empty">Ask a question or work through an idea. Nexus retrieves relevant saved memory before responding.</p></div>
+          <form id="chat-form" class="composer"><label for="chat-input">Message</label><textarea id="chat-input" rows="3" maxlength="3900" required placeholder="What would you like to work on?"></textarea><div class="composer-footer"><small>Nexus keeps a local activity record. Save useful facts in memory.</small><button id="send-chat" type="submit">Send message</button></div></form>
+        </section>
+        <aside class="card memory-card" aria-labelledby="memory-title">
+          <div class="card-heading"><div><p class="eyebrow">Keep the useful parts</p><h2 id="memory-title">Memory</h2></div></div>
+          <form id="search-form"><label for="memory-query">Search saved memory</label><div class="search-row"><input id="memory-query" maxlength="3900" placeholder="A person, project, or decision" required><button id="search-memory" class="secondary" type="submit">Search</button></div></form>
+          <pre id="memory-results" class="memory-results" aria-live="polite">Search to recall saved context.</pre>
+          <form id="remember-form" class="remember-form"><label for="memory-input">Save a memory</label><textarea id="memory-input" rows="4" maxlength="3900" required placeholder="A fact or decision Nexus should remember…"></textarea><button id="save-memory" type="submit" class="secondary">Save memory</button><p id="save-result" class="hint" role="status"></p></form>
+        </aside>
+      </div>
+      <footer>Memory and documents remain local. Drafts require your review; this workspace does not send messages or execute external actions.</footer>
+    </div>
+  </main>
+</body>
+</html>

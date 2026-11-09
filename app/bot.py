@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import hashlib
+import os
+from pathlib import Path
 from datetime import UTC, datetime
 
 import httpx
@@ -15,6 +18,7 @@ from app.cohort import handle_cohort
 from app.memory import MemoryStore
 from app.pep_client import PepClient
 from app.telemetry import log_event
+from app.local_lock import FileLease
 
 
 class TelegramBotRunner:
@@ -36,14 +40,29 @@ class TelegramBotRunner:
         self._logger = logging.getLogger("aari-nexus-azure.bot")
         self._arbiter = NexusArbiter()
         self.memory_store = MemoryStore(settings.nexus_memory_path)
+        self._poller_lease = None
 
     async def start(self) -> None:
+        if self._task is not None:
+            raise RuntimeError('Poller already started')
+        root = Path(os.getenv('NEXUS_POLLER_LOCK_DIR') or
+                    str(Path(os.getenv('LOCALAPPDATA') or Path.home() / '.local' / 'share') / 'AARI' / 'Nexus' / 'pollers'))
+        fingerprint = hashlib.sha256(self.settings.telegram_bot_token.encode()).hexdigest()
+        self._poller_lease = FileLease(root / (fingerprint + '.lock'))
+        self._poller_lease.__enter__()
         self._task = asyncio.create_task(self._poll_loop())
 
     async def stop(self) -> None:
         self._stop_event.set()
         if self._task is not None:
-            await self._task
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self._task = None
+                self._poller_lease.__exit__(None, None, None)
 
     async def _poll_loop(self) -> None:
         async with httpx.AsyncClient(timeout=35) as client:
@@ -104,7 +123,7 @@ class TelegramBotRunner:
             dependency_status = ",".join(f"{name}={status}" for name, status in services.items())
         elif decision.command == "/brief":
             reply = await handle_brief(decision.prompt, self.settings, self.openai_client, self.memory_store)
-            dependency_status = "arbiter-preflight,memory,azure-openai"
+            dependency_status = f"arbiter-preflight,memory,{self.settings.model_provider}"
         elif decision.command in {"/remember", "/find", "/followup", "/prep", "/draft", "/task"}:
             reply = await handle_operational_command(
                 decision.command,

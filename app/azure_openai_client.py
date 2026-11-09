@@ -5,6 +5,7 @@ import asyncio
 from openai import AsyncAzureOpenAI
 
 from app.config import Settings
+from app.cloud_authorization import PaidJobApproval
 
 
 class AzureOpenAIClient:
@@ -14,16 +15,22 @@ class AzureOpenAIClient:
             api_key=settings.azure_openai_api_key,
             api_version=settings.azure_openai_api_version,
             azure_endpoint=settings.azure_openai_endpoint,
+            max_retries=0,
         )
 
-    async def brief(self, prompt: str) -> str:
+    async def brief(self, prompt: str, *, approval: PaidJobApproval | None = None) -> str:
         return await self.complete(
             "You are AARI Nexus Operator. Give concise, direct answers with no fluff.",
             prompt,
             max_tokens=300,
+            approval=approval,
         )
 
-    async def complete(self, system_prompt: str, user_prompt: str, max_tokens: int = 450) -> str:
+    async def complete(self, system_prompt: str, user_prompt: str, max_tokens: int = 450,
+                       *, approval: PaidJobApproval | None = None) -> str:
+        if not isinstance(approval, PaidJobApproval):
+            raise PermissionError('Paid cloud inference requires explicit per-job operator approval')
+        approval.consume(system_prompt, user_prompt, max_tokens, self.settings.azure_openai_deployment)
         response = await asyncio.wait_for(
             self.client.chat.completions.create(
                 model=self.settings.azure_openai_deployment,
@@ -42,25 +49,6 @@ class AzureOpenAIClient:
         return response.choices[0].message.content or ""
 
     async def probe(self) -> dict[str, object]:
-        try:
-            await asyncio.wait_for(
-                self.client.chat.completions.create(
-                    model=self.settings.azure_openai_deployment,
-                    temperature=0,
-                    max_tokens=1,
-                    messages=[{"role": "user", "content": "ping"}],
-                ),
-                timeout=self.settings.model_timeout_seconds,
-            )
-            return {
-                "healthy": True,
-                "status_code": 200,
-                "deployment_found": True,
-            }
-        except Exception as exc:
-            status_code = getattr(exc, "status_code", None) or 500
-            return {
-                "healthy": False,
-                "status_code": status_code,
-                "deployment_found": status_code != 404,
-            }
+        # A status request is not permission to purchase even a one-token completion.
+        return {'healthy': False, 'status_code': 403, 'deployment_found': False,
+                'authorization_required': True}
