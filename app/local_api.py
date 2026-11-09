@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from app.arbiter import NexusArbiter
+from app.assessments import AssessmentWorkflow, ReviewRequired
 from app.bot import TelegramBotRunner
 from app.cohort import handle_cohort
 from app.commands import handle_operational_command, handle_ping, handle_help, handle_status
@@ -57,21 +58,25 @@ def create_app(settings=None, model=None):
     documents = artifacts / 'documents'
     documents.mkdir(parents=True, exist_ok=True)
     arbiter = NexusArbiter()
+    assessments = AssessmentWorkflow(runner.memory_store, artifacts, model)
 
     @asynccontextmanager
     async def lifespan(app):
         with FileLease(data / 'runtime.lock'):
-            if settings.telegram_enabled:
-                await runner.start()
+            assessments.start()
             try:
+                if settings.telegram_enabled:
+                    await runner.start()
                 yield
             finally:
+                await asyncio.to_thread(assessments.stop)
                 if settings.telegram_enabled:
                     await runner.stop()
 
     app = FastAPI(title='Nexus local operator', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.memory = runner.memory_store
     app.state.runner = runner
+    app.state.assessments = assessments
 
     @app.middleware('http')
     async def local_boundary(request: Request, call_next):
@@ -141,6 +146,27 @@ def create_app(settings=None, model=None):
     async def health():
         return {'status': 'ok', 'service': 'nexus-local', 'provider': 'ollama',
                 'telegram_polling': settings.telegram_enabled, 'paid_cloud': 'disabled', 'pid': os.getpid()}
+
+    @app.get('/local/assessments', dependencies=[Depends(authenticate)])
+    async def assessment_dashboard():
+        return await asyncio.to_thread(assessments.snapshot)
+
+    @app.post('/local/assessments/{job_id}/retry', dependencies=[Depends(authenticate)])
+    async def retry_assessment(job_id: str):
+        try:
+            await asyncio.to_thread(assessments.retry, job_id)
+        except ReviewRequired as error:
+            raise HTTPException(409, str(error)) from None
+        return {'status': 'pending'}
+
+    @app.get('/local/assessment-outputs/{name:path}', dependencies=[Depends(authenticate)])
+    async def assessment_output(name: str):
+        if not re.fullmatch(r'(?:[a-f0-9]{64}/)?(?:job\.json|cohort-[a-f0-9]{24}\.(?:json|html))', name):
+            raise HTTPException(404, 'Assessment output not found')
+        target = assessments.outputs / name
+        if not target.is_file() or any(p.is_symlink() for p in [target, *target.parents]):
+            raise HTTPException(404, 'Assessment output not found')
+        return FileResponse(target, filename=target.name, media_type='application/octet-stream')
 
     @app.post('/local/command', dependencies=[Depends(authenticate)])
     async def command(body: Command):

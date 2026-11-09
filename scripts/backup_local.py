@@ -26,8 +26,10 @@ def database_counts(database):
     with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as conn:
         if conn.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
             raise ValueError('SQLite integrity check failed')
+        allowed = ('memories', 'action_packages', 'assessment_jobs', 'assessment_results', 'assessment_keys', 'assessment_events')
+        existing = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         return {table: conn.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
-                for table in ('memories', 'action_packages')}
+                for table in allowed if table in existing}
 
 
 def backup(data: Path, destination: Path):

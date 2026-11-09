@@ -19,6 +19,11 @@ persistent private state. It does not fall back to paid inference. The Azure
 adapter now requires explicit approval for each paid inference job; status probes
 do not purchase completions. Production Azure has not been redeployed by this work.
 
+The local runtime also watches an assessment intake folder, validates and scores
+exports against versioned keys, persists student histories, and writes cohort
+reports through a durable queue. See [local assessment operation and acceptance](docs/local-assessments.md).
+Real assessment schema, approved keys and roster must be supplied before real-data use.
+
 ## Commands
 
 - `/ping` -> bot-only liveness check with `pong`, `latency_ms`, `bot_pid`, `app_version`

@@ -33,6 +33,17 @@
         <div class="status-card"><span>Telegram</span><strong id="telegram-status">Disabled</strong><small id="uptime">Local operator</small></div>
       </section>
       <p id="workspace-error" class="error" role="alert"></p>
+      <section class="card assessment-card" aria-labelledby="assessment-title">
+        <div class="card-heading"><div><p class="eyebrow">Automatic local processing</p><h2 id="assessment-title">Student assessments</h2></div><span id="assessment-watcher" role="status">Checking watcher</span></div>
+        <div class="assessment-content">
+          <p id="assessment-paths" class="hint"></p>
+          <p id="assessment-dependency" class="error" role="alert"></p>
+          <p id="assessment-counts" role="status"></p>
+          <div id="assessment-reports" class="assessment-links"></div>
+          <div class="assessment-table"><table><caption>Latest 200 jobs. Updates every five seconds.</caption><thead><tr><th>File / job</th><th>Status</th><th>Attempts</th><th>Issues and outputs</th></tr></thead><tbody id="assessment-jobs"></tbody></table></div>
+          <details><summary>Recent audit history</summary><pre id="assessment-audit"></pre></details>
+        </div>
+      </section>
       <div class="workspace-grid">
         <section class="card chat-card" aria-labelledby="chat-title">
           <div class="card-heading"><div><p class="eyebrow">Think it through</p><h2 id="chat-title">Chat with Nexus</h2></div><span class="local-badge">Ollama · local</span></div>
@@ -46,7 +57,7 @@
           <form id="remember-form" class="remember-form"><label for="memory-input">Save a memory</label><textarea id="memory-input" rows="4" maxlength="3900" required placeholder="A fact or decision Nexus should remember…"></textarea><button id="save-memory" type="submit" class="secondary">Save memory</button><p id="save-result" class="hint" role="status"></p></form>
         </aside>
       </div>
-      <footer>Memory and documents remain local. Drafts require your review; this workspace does not send messages or execute external actions.</footer>
+      <footer>Assessments process automatically while Nexus is running. Files, verified results, reports and audit history stay on this machine. Qualitative interpretation requires staff review.</footer>
     </div>
   </main>
 </body>

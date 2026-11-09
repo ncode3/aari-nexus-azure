@@ -43,6 +43,12 @@ identity, and stop the Windows launcher plus child interpreter. State is in
 the checkout. They neither change Azure nor enable Telegram. Keep the host awake;
 no automatic Windows startup task is installed.
 
+The local API now starts the [autonomous assessment workflow](local-assessments.md)
+under the same runtime lease. Its intake, configuration, sources and reports
+live beneath `artifacts/assessments/`, and its queue/results share the existing
+SQLite database. The browser workspace includes the queue dashboard. Restart
+the runtime after installing code changes to load the watcher.
+
 One-time synthetic acceptance and initial state installation (refuses existing
 state or configuration):
 
